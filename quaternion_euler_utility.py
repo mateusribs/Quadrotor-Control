@@ -71,3 +71,16 @@ def quat_rot_mat(q):
                   [2*b*c+2*a*d, a**2-b**2+c**2-d**2, 2*c*d-2*a*b],
                   [2*b*d-2*a*c, 2*c*d+2*a*b, a**2-b**2-c**2+d**2]])
     return R
+
+def quat_prod(p, q):
+
+    ps = p[0]
+    pv = np.array([p[1], p[2], p[3]])
+    qs = q[0]
+    qv = np.array([q[1], q[2], q[3]])
+
+    quat0 = ps*qs - pv.T@qv
+    quatV = ps*qv + qs*pv + np.cross(pv, qv, axis=0)
+    quatRes = np.concatenate((quat0, quatV), axis=0)
+
+    return quatRes

@@ -2,9 +2,9 @@ from scipy import integrate
 import numpy as np
 from quaternion_euler_utility import euler_quat, quat_euler, deriv_quat, quat_rot_mat
 from numpy.linalg import norm
-# from mpl_toolkits.mplot3d import Axes3D
-# import matplotlib
-# from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib
+from matplotlib import pyplot as plt
 from scipy.spatial.transform import Rotation
 
 """""
@@ -494,7 +494,7 @@ class quad():
         self.done_condition()
         self.reward_function()
         self.control_effort()
-        return self.quat_state, self.reward, self.done
+        return self.state, self.reward, self.done
 
     def done_condition(self):
         
@@ -723,111 +723,111 @@ class sensor():
         return q
         
         
-# class plotter(): 
+class plotter(): 
         
-#     """""
-#     Render Class: Saves state and time until plot function is called.
-#                     Optionally: Plots a 3D graph of the position, with optional target position.
+    """""
+    Render Class: Saves state and time until plot function is called.
+                    Optionally: Plots a 3D graph of the position, with optional target position.
     
-#     init input:
-#         env: 
-#             class - quadrotor enviorment
-#         depth_plot:
-#             boolean - plot coordinates over time on 3D space
+    init input:
+        env: 
+            class - quadrotor enviorment
+        depth_plot:
+            boolean - plot coordinates over time on 3D space
             
             
-#     add: saves a state and a time
-#     clear: clear memory
-#     plot: plot saved states     
-#     """""   
+    add: saves a state and a time
+    clear: clear memory
+    plot: plot saved states     
+    """""   
     
-#     def __init__(self, env, velocity_plot = False, depth_plot=False):        
-#         plt.close('all')
-#         self.figure = plt.figure('States')
-#         self.depth_plot = depth_plot
-#         self.env = env
-#         self.states = []
-#         self.times = []
-#         self.print_list = range(13)
-#         if velocity_plot:
-#             self.plot_labels = ['$\dot X$', '$\dot Y$', '$\dot Z$',
-#                                 '', '', '',
-#                                 '$\phi$', '$\\theta$', '$\psi$', 
-#                                 '$T_{MH,1}$', '$T_{MH,2}$', '$T_{MH,3}$', '$T_{MH,4}$']
-#             self.axis_labels = ['Velocidade (ms)', 'Velocidade (ms)', 'Velocidade (ms)',
-#                                 'Velocidade (ms)', 'Velocidade (ms)', 'Velocidade (ms)',
-#                                 'Atitude (rad)', 'Atitude (rad)', 'Atitude (rad)', 
-#                                 'Empuxo (N)', 'Empuxo (N)', 'Empuxo (N)', 'Empuxo (N)']
-#             self.depth_plot = False
-#         else:
-#             self.plot_labels = ['x', 'y', 'z',
-#                                 '$\phi$', '$\theta$', '$\psi$', 
-#                                 '$u_1$', '$u_2$', '$u_3$', '$u_4$']
+    def __init__(self, env, velocity_plot = False, depth_plot=False):        
+        plt.close('all')
+        self.figure = plt.figure('States')
+        self.depth_plot = depth_plot
+        self.env = env
+        self.states = []
+        self.times = []
+        self.print_list = range(13)
+        if velocity_plot:
+            self.plot_labels = ['$\dot X$', '$\dot Y$', '$\dot Z$',
+                                '', '', '',
+                                '$\phi$', '$\\theta$', '$\psi$', 
+                                '$T_{MH,1}$', '$T_{MH,2}$', '$T_{MH,3}$', '$T_{MH,4}$']
+            self.axis_labels = ['Velocidade (ms)', 'Velocidade (ms)', 'Velocidade (ms)',
+                                'Velocidade (ms)', 'Velocidade (ms)', 'Velocidade (ms)',
+                                'Atitude (rad)', 'Atitude (rad)', 'Atitude (rad)', 
+                                'Empuxo (N)', 'Empuxo (N)', 'Empuxo (N)', 'Empuxo (N)']
+            self.depth_plot = False
+        else:
+            self.plot_labels = ['x', 'y', 'z',
+                                '$\phi$', '$\theta$', '$\psi$', 
+                                '$u_1$', '$u_2$', '$u_3$', '$u_4$']
             
-#         self.line_styles = ['-', '-', '-',
-#                             '--', '--', '--',
-#                             '--', '--', '--', 
-#                             ':', ':', ':', ':']
-#         self.color = ['r', 'g', 'b',
-#                       'r', 'g', 'b',
-#                       'r', 'g', 'b',
-#                       'r', 'g', 'b', 'c']
-#         self.plot_place = [0, 0, 0,
-#                            0, 0, 0,
-#                            1, 1, 1,
-#                            2, 2, 2, 2]
-#         self.velocity_plot = velocity_plot
+        self.line_styles = ['-', '-', '-',
+                            '--', '--', '--',
+                            '--', '--', '--', 
+                            ':', ':', ':', ':']
+        self.color = ['r', 'g', 'b',
+                      'r', 'g', 'b',
+                      'r', 'g', 'b',
+                      'r', 'g', 'b', 'c']
+        self.plot_place = [0, 0, 0,
+                           0, 0, 0,
+                           1, 1, 1,
+                           2, 2, 2, 2]
+        self.velocity_plot = velocity_plot
         
-#     def add(self, target):
-#         if self.velocity_plot:
-#             # state = np.concatenate((self.env.state[1:6:2].flatten(), target[1:6:2], self.env.ang.flatten(), self.env.clipped_action.flatten()))
-#             state = np.concatenate((self.env.state[1:6:2].flatten(), target[1:6:2], self.env.ang.flatten(), (self.env.step_effort.flatten()+1)*T2WR*M*G/8 ))
-#         else:
-#             state = np.concatenate((self.env.state[0:5:2].flatten(), self.env.ang.flatten(), self.env.clipped_action.flatten()))
-#         self.states.append(state)
-#         self.times.append(self.env.i*self.env.t_step)
+    def add(self, target):
+        if self.velocity_plot:
+            # state = np.concatenate((self.env.state[1:6:2].flatten(), target[1:6:2], self.env.ang.flatten(), self.env.clipped_action.flatten()))
+            state = np.concatenate((self.env.state[1:6:2].flatten(), target[1:6:2], self.env.ang.flatten(), (self.env.step_effort.flatten()+1)*T2WR*M*G/8 ))
+        else:
+            state = np.concatenate((self.env.state[0:5:2].flatten(), self.env.ang.flatten(), self.env.clipped_action.flatten()))
+        self.states.append(state)
+        self.times.append(self.env.i*self.env.t_step)
 
         
-#     def clear(self,):
-#         self.states = []
-#         self.times = []
+    def clear(self,):
+        self.states = []
+        self.times = []
         
-#     def plot(self, nome='padrao'):
-#         P = 0.7
-#         fig, self.axs = plt.subplots(3, figsize = (7, 7*1.414), dpi=300)
-#         # fig.suptitle(nome)
-#         self.states = np.array(self.states)
-#         self.times = np.array(self.times)
-#         for print_state, label, line_style, axis_place, color, name in zip(self.print_list, self.plot_labels, self.line_styles, self.plot_place, self.color, self.axis_labels):
-#             self.axs[axis_place].plot(self.times, self.states[:,print_state], label = label, ls=line_style, lw=0.8, color = color)
-#             self.axs[axis_place].legend()
-#             self.axs[axis_place].grid(True)
-#             self.axs[axis_place].set(ylabel=name)
-#         self.axs[2].axhline(y=T2WR*M*G/4)
-#         self.axs[2].axhline(y=0)
-#         plt.xlabel('tempo (s)')
-#         plt.savefig(nome+'.pgf', bbox_inches='tight')
-#         plt.savefig(nome+'.png', bbox_inches='tight')
-#         # plt.title(nome[-40:])
-#         # plt.show()
-#         if self.depth_plot:
-#             fig3d = plt.figure('3D map')
-#             ax = Axes3D(fig3d)
-#             ax.set_xlabel('x (m)')
-#             ax.set_ylabel('y (m)')       
-#             ax.set_zlabel('z (m)')    
-#             states = np.array(self.states)
-#             times = np.array(self.times)
-#             xs = self.states[:,0]
-#             ys = self.states[:,1]
-#             zs = self.states[:,2]
-#             t = self.times
-#             ax.scatter(xs,ys,zs,c=plt.cm.jet(t/max(t)))
-#             ax.plot3D(xs,ys,zs,linewidth=0.5)
-#             ax.set_xlim(-BB_POS, BB_POS)
-#             ax.set_ylim(-BB_POS, BB_POS)
-#             ax.set_zlim(-BB_POS, BB_POS)
-#             plt.grid(True)
-#             # plt.show()
+    def plot(self, nome='padrao'):
+        P = 0.7
+        fig, self.axs = plt.subplots(3, figsize = (7, 7*1.414), dpi=300)
+        # fig.suptitle(nome)
+        self.states = np.array(self.states)
+        self.times = np.array(self.times)
+        for print_state, label, line_style, axis_place, color, name in zip(self.print_list, self.plot_labels, self.line_styles, self.plot_place, self.color, self.axis_labels):
+            self.axs[axis_place].plot(self.times, self.states[:,print_state], label = label, ls=line_style, lw=0.8, color = color)
+            self.axs[axis_place].legend()
+            self.axs[axis_place].grid(True)
+            self.axs[axis_place].set(ylabel=name)
+        self.axs[2].axhline(y=T2WR*M*G/4)
+        self.axs[2].axhline(y=0)
+        # plt.xlabel('tempo (s)')
+        # plt.savefig(nome+'.pgf', bbox_inches='tight')
+        # plt.savefig(nome+'.png', bbox_inches='tight')
+        # plt.title(nome[-40:])
+        plt.show()
+        if self.depth_plot:
+            fig3d = plt.figure('3D map')
+            ax = Axes3D(fig3d)
+            ax.set_xlabel('x (m)')
+            ax.set_ylabel('y (m)')       
+            ax.set_zlabel('z (m)')    
+            states = np.array(self.states)
+            times = np.array(self.times)
+            xs = self.states[:,0]
+            ys = self.states[:,1]
+            zs = self.states[:,2]
+            t = self.times
+            ax.scatter(xs,ys,zs,c=plt.cm.jet(t/max(t)))
+            ax.plot3D(xs,ys,zs,linewidth=0.5)
+            ax.set_xlim(-BB_POS, BB_POS)
+            ax.set_ylim(-BB_POS, BB_POS)
+            ax.set_zlim(-BB_POS, BB_POS)
+            plt.grid(True)
+            plt.show()
             
-#         self.clear()
+        self.clear()
