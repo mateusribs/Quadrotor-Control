@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 #Quadrotor Model Object
 quad_model = quad(t_step=0.01, n=1, training=False, euler=0, direct_control=0, T=1, clipped=False)
-seed = quad_model.seed(2)
+# seed = quad_model.seed(2)
 
 #Constants
 J = np.array([[16.83*10**-3, 0, 0],
