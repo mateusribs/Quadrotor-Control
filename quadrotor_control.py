@@ -26,14 +26,14 @@ class Controller:
         # Trajectory 1
         x = radius*np.cos(alpha)*0
         y = radius*np.sin(alpha)*0
-        z = min_h + d_height/(t[-1])*t*0
+        z = min_h + d_height/(t[-1])*t
 
         x_dot = -radius*np.sin(alpha)*2*np.pi*frequency*0
         y_dot = radius*np.cos(alpha)*2*np.pi*frequency*0
-        z_dot = d_height/(t[-1])*np.ones(len(t))*0
+        z_dot = d_height/(t[-1])*np.ones(len(t))
 
-        x_dot_dot = -radius*np.cos(alpha)*(2*np.pi*frequency)**2
-        y_dot_dot = -radius*np.sin(alpha)*(2*np.pi*frequency)**2
+        x_dot_dot = -radius*np.cos(alpha)*(2*np.pi*frequency)**2*0
+        y_dot_dot = -radius*np.sin(alpha)*(2*np.pi*frequency)**2*0
         z_dot_dot = 0*np.ones(len(t))
 
         # Vector of x and y changes per sample time
@@ -45,37 +45,71 @@ class Controller:
         dy = np.append(np.array(dy[0]),dy)
         dz = np.append(np.array(dz[0]),dz)
 
+        # Define the reference yaw angles
+        psi=np.zeros(len(x))
+        psiInt=psi
+        psi[0]=np.arctan2(y[0],x[0])+np.pi/2
+        psi[1:len(psi)]=np.arctan2(dy[1:len(dy)],dx[1:len(dx)])
 
-        return x, x_dot, x_dot_dot, y, y_dot, y_dot_dot, z, z_dot, z_dot_dot
+        # We want the yaw angle to keep track the amount of rotations
+        dpsi=psi[1:len(psi)]-psi[0:len(psi)-1]
+        psiInt[0]=psi[0]
+        for i in range(1,len(psiInt)):
+            if dpsi[i-1]<-np.pi:
+                psiInt[i]=psiInt[i-1]+(dpsi[i-1]+2*np.pi)
+            elif dpsi[i-1]>np.pi:
+                psiInt[i]=psiInt[i-1]+(dpsi[i-1]-2*np.pi)
+            else:
+                psiInt[i]=psiInt[i-1]+dpsi[i-1]
+
+
+        return x, x_dot, x_dot_dot, y, y_dot, y_dot_dot, z, z_dot, z_dot_dot, psiInt
     
     
-    def pos_control(self, pos_atual, pos_desired, K):
+    def pos_control(self, pos_atual, pos_desired, qzd, K):
 
         #Compute error
-        pos_error = pos_atual - pos_desired
+        pos_error = pos_desired - pos_atual
+        position_error = pos_error[0:3]
+        vel_error = pos_error[3:6]
 
+        Kp = np.array([[6, 0 ,0],
+                       [0, -6, 0],
+                       [0, 0, 15]])
+        Kd = np.array([[7, 0, 0],
+                       [0, -7, 0],
+                       [0, 0, 10]])
+        # print(pos_error.T)
         #Compute Optimal Control Law
-        u = -K@pos_error
+        u = Kp@position_error + Kd@vel_error
         
         #Optimal Input
-        uxd = float(u[0])
-        uyd = float(u[1])
+        mod_u = np.linalg.norm(u)
+        uxd = float(u[0])/mod_u
+        uyd = float(u[1])/mod_u
         dT = float(u[2])
 
-        mod_uxyd = np.sqrt(uxd**2+uyd**2)
-        alpha = np.arcsin(mod_uxyd)
+        # b = np.array([[0],[0],[1]])
+        # rf = u/mod_u
 
-        q0d = np.cos(alpha/2)
-        q1d = uyd/(2*q0d)
-        q2d = uxd/(2*q0d)
-    
+        # scalar = 1+b.T@rf
+        # vec = np.cross(b, rf, axis=0)
+        # qpd = (1/np.sqrt(2*(1+b.T@rf)))*np.concatenate((scalar, vec), axis=0)
+
+        q1d = uyd/2
+        q2d = uxd/2
+
+        q0d = float(np.sqrt(1 - q1d**2 - q2d**2))
 
         #Desired quaternion
         qpd = np.array([[q0d, q1d, q2d, 0]],dtype='float32').T
         mod_qpd = np.linalg.norm(qpd)
+        qpd = qpd/mod_qpd
         qzd = np.array([[1, 0, 0, 0]],dtype='float32').T
         qd = quat_prod(qpd, qzd)
-        qdv = qd[1:4]
+        qd = qd/np.linalg.norm(qd)
+        
+        # print(qd.T)
 
         return dT, qd
     
@@ -92,10 +126,16 @@ class Controller:
         eta_error = np.zeros((3,1)) - eta_atual
 
         att_error = np.concatenate((q_error[1:4], eta_error), axis=0)
-
+        
+        Kp = np.array([[13, 0 ,0],
+                       [0, 13, 0],
+                       [0, 0, 13]])
+        Kd = np.array([[1, 0, 0],
+                       [0, 1, 0],
+                       [0, 0, 2]])
         # print(att_error.T)
         #Compute Optimal Control Law
-        u = -K@att_error
+        u = Kp@q_error[1:4] + Kd@eta_error
 
         #Optimal input
         tau_x = float(u[0])
