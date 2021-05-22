@@ -114,7 +114,9 @@ for i in range(outer_length):
 
     # print('-------------------------------------------------------------------------------')
     # print(T)
-    # print('-------------------------------------------------------------------------')
+    print('-------------------------------------------------------------------------')
+
+    print("Atitude de referencia:",q_ref.T)
 
     for j in range(inner_length):
 
@@ -129,8 +131,8 @@ for i in range(outer_length):
         q_atual = np.array([[x[6], x[7], x[8], x[9]]]).T
         eta_atual = np.array([[x[10], x[11], x[12]]]).T
 
-        print("Posição:", pos_atual.T)
-        print("Atitude:", q_atual.T)
+    print("Posição:", pos_atual.T)
+    print("Atitude Atual:", q_atual.T)
      
 
         # print(q_atual.T)

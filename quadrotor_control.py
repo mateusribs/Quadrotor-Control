@@ -73,20 +73,20 @@ class Controller:
         position_error = pos_error[0:3]
         vel_error = pos_error[3:6]
 
-        Kp = np.array([[6, 0 ,0],
-                       [0, -6, 0],
+        Kp = np.array([[8, 0 ,0],
+                       [0, -8, 0],
                        [0, 0, 15]])
         Kd = np.array([[7, 0, 0],
                        [0, -7, 0],
-                       [0, 0, 10]])
+                       [0, 0, 15]])
         # print(pos_error.T)
         #Compute Optimal Control Law
         u = Kp@position_error + Kd@vel_error
         
         #Optimal Input
         mod_u = np.linalg.norm(u)
-        uxd = float(u[0])/mod_u
-        uyd = float(u[1])/mod_u
+        uxd = float(u[0])
+        uyd = float(u[1])
         dT = float(u[2])
 
         # b = np.array([[0],[0],[1]])
@@ -127,11 +127,11 @@ class Controller:
 
         att_error = np.concatenate((q_error[1:4], eta_error), axis=0)
         
-        Kp = np.array([[13, 0 ,0],
-                       [0, 13, 0],
+        Kp = np.array([[15, 0 ,0],
+                       [0, 15, 0],
                        [0, 0, 13]])
-        Kd = np.array([[1, 0, 0],
-                       [0, 1, 0],
+        Kd = np.array([[3, 0, 0],
+                       [0, 3, 0],
                        [0, 0, 2]])
         # print(att_error.T)
         #Compute Optimal Control Law
