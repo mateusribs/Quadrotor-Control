@@ -1,19 +1,109 @@
 import numpy as np
+from numpy.core.numeric import NaN
 from quaternion_euler_utility import deriv_quat
 from quaternion_euler_utility import quat_prod
+from scipy.linalg import solve_continuous_are as solve_lqr
+
 
 class Controller:
 
+    #Constants
+    J = np.array([[16.83*10**-3, 0, 0],
+                  [0, 16.83*10**-3, 0],
+                  [0, 0, 28.34*10**-3]])
+    Ixx = 16.83*10**-3
+    Iyy = 16.83*10**-3
+    Izz = 28.34*10**-3
+    #Mass and Gravity
+    M, G = 1.03, 9.82
 
-
+    KT = 1.435*10**-5
+    KD = 2.4086*10**-7
+    L = 0.26
 
     def __init__(self, total_time, sample_time, inner_length):
         
         self.total_t = total_time
         self.Ts = sample_time
         self.il = inner_length
-        
+
+        self.nd_ant = 1
+        self.ed1_ant = 0
+        self.ed2_ant = 0
+        self.ed3_ant = 0
     
+    def linearized_matrices(self, quaternion = True):
+
+        if quaternion:
+            #Linearized System - Quaternion Approach
+
+            zeros = np.zeros((3,3))
+
+            #Attitude Dynamics
+
+            A12_a = np.eye(3)*0.5
+
+            A_up_a = np.concatenate((zeros, A12_a), axis=1)
+            A_down_a = np.concatenate((zeros, zeros), axis=1)
+            A_a = np.concatenate((A_up_a, A_down_a), axis=0)
+
+            B21_a = np.array([[1/self.J[0,0], 0, 0], [0, 1/self.J[1,1], 0], [0, 0, 1/self.J[2,2]]])
+            B_a = np.concatenate((zeros, B21_a), axis=0)
+
+            #Translational Dynamics
+
+            A12_t = np.eye(3)
+
+            A_up_t = np.concatenate((zeros, A12_t), axis=1)
+            A_down_t = np.concatenate((zeros, zeros), axis=1)
+            A_t = np.concatenate((A_up_t, A_down_t), axis=0)
+
+            B21_t = np.array([[self.G, 0, 0],
+                                [0, -self.G, 0],
+                                [0, 0, 1/self.M]])
+
+            B_t = np.concatenate((zeros, B21_t), axis=0)
+        
+        else:
+            #Linearized System - Euler Approach
+
+            zeros = np.zeros((3,3))
+
+            #Attitude Dynamics
+
+            A12_a = np.eye(3)
+
+            A_up_a = np.concatenate((zeros, A12_a), axis=1)
+            A_down_a = np.concatenate((zeros, zeros), axis=1)
+            A_a = np.concatenate((A_up_a, A_down_a), axis=0)
+
+            B21_a = np.array([[1/self.Ixx, 0, 0], [0, 1/self.Iyy, 0], [0, 0, 1/self.Izz]])
+            B_a = np.concatenate((zeros, B21_a), axis=0)
+
+            #Translational Dynamics
+
+            A12_t = np.eye(3)
+
+            A_up_t = np.concatenate((zeros, A12_t), axis=1)
+            A_down_t = np.concatenate((zeros, zeros), axis=1)
+            A_t = np.concatenate((A_up_t, A_down_t), axis=0)
+
+            B21_t = np.array([[self.G, 0, 0],
+                                [0, -self.G, 0],
+                                [0, 0, 1/self.M]])
+
+            B_t = np.concatenate((zeros, B21_t), axis=0) 
+
+        
+        return A_t, B_t, A_a, B_a
+    
+    def LQR_gain(self, A, B, Q, R):
+
+        P = solve_lqr(A, B, Q, R)
+        K = -np.linalg.inv(R)@B.T@P
+    
+        return K
+
     def trajectory_generator(self, radius, frequency, max_h, min_h):
         
         t = np.arange(0, self.total_t + self.Ts*self.il, self.Ts*self.il)
@@ -24,15 +114,15 @@ class Controller:
         alpha = 2*np.pi*frequency*t
 
         # Trajectory 1
-        x = radius*np.cos(alpha)*0
+        x = radius*np.cos(alpha)
         y = radius*np.sin(alpha)*0
         z = min_h + d_height/(t[-1])*t
 
-        x_dot = -radius*np.sin(alpha)*2*np.pi*frequency*0
+        x_dot = -radius*np.sin(alpha)*2*np.pi*frequency
         y_dot = radius*np.cos(alpha)*2*np.pi*frequency*0
         z_dot = d_height/(t[-1])*np.ones(len(t))
 
-        x_dot_dot = -radius*np.cos(alpha)*(2*np.pi*frequency)**2*0
+        x_dot_dot = -radius*np.cos(alpha)*(2*np.pi*frequency)**2
         y_dot_dot = -radius*np.sin(alpha)*(2*np.pi*frequency)**2*0
         z_dot_dot = 0*np.ones(len(t))
 
@@ -66,76 +156,38 @@ class Controller:
         return x, x_dot, x_dot_dot, y, y_dot, y_dot_dot, z, z_dot, z_dot_dot, psiInt
     
     
-    def pos_control(self, pos_atual, pos_desired, qzd, K):
+    def pos_control(self, pos_atual, pos_des, vel_atual, vel_des, K):
 
         #Compute error
-        pos_error = pos_desired - pos_atual
-        position_error = pos_error[0:3]
-        vel_error = pos_error[3:6]
+        pos_error = pos_des - pos_atual
+        vel_error = vel_des - vel_atual
 
-        Kp = np.array([[8, 0 ,0],
-                       [0, -8, 0],
-                       [0, 0, 15]])
-        Kd = np.array([[7, 0, 0],
-                       [0, -7, 0],
-                       [0, 0, 15]])
+
         # print(pos_error.T)
         #Compute Optimal Control Law
-        u = Kp@position_error + Kd@vel_error
+        u = -K@np.concatenate((pos_error, vel_error), axis=0)
         
-        #Optimal Input
-        mod_u = np.linalg.norm(u)
-        uxd = float(u[0])
-        uyd = float(u[1])
-        dT = float(u[2])
-
-        # b = np.array([[0],[0],[1]])
-        # rf = u/mod_u
-
-        # scalar = 1+b.T@rf
-        # vec = np.cross(b, rf, axis=0)
-        # qpd = (1/np.sqrt(2*(1+b.T@rf)))*np.concatenate((scalar, vec), axis=0)
-
-        q1d = uyd/2
-        q2d = uxd/2
-
-        q0d = float(np.sqrt(1 - q1d**2 - q2d**2))
-
-        #Desired quaternion
-        qpd = np.array([[q0d, q1d, q2d, 0]],dtype='float32').T
-        mod_qpd = np.linalg.norm(qpd)
-        qpd = qpd/mod_qpd
-        qzd = np.array([[1, 0, 0, 0]],dtype='float32').T
-        qd = quat_prod(qpd, qzd)
-        qd = qd/np.linalg.norm(qd)
         
-        # print(qd.T)
 
         return dT, qd
     
-    def att_control(self, q_atual, eta_atual, q_des, K):
-        
+    def att_control(self, ang_atual, ang_des, ang_vel_atual, K):
+
+        phi = float(ang_atual[0])
+        theta = float(ang_atual[1])
+        psi = float(ang_atual[2])
 
         #Compute error
-        q_conj = np.concatenate((q_atual[0].reshape(1,1), -q_atual[1:4]), axis=0)
-        q_error = quat_prod(q_conj, q_des)
-
-        if q_error[0] < 0:
-            q_error = -q_error
-
-        eta_error = np.zeros((3,1)) - eta_atual
-
-        att_error = np.concatenate((q_error[1:4], eta_error), axis=0)
         
-        Kp = np.array([[15, 0 ,0],
-                       [0, 15, 0],
-                       [0, 0, 13]])
-        Kd = np.array([[3, 0, 0],
-                       [0, 3, 0],
-                       [0, 0, 2]])
-        # print(att_error.T)
+        ang_error = ang_des - ang_atual
+        ang_vel_error = np.zeros((3,1)) - ang_vel_atual
+
         #Compute Optimal Control Law
-        u = Kp@q_error[1:4] + Kd@eta_error
+        T = np.array([[1/self.Ixx, np.sin(phi)*np.tan(theta)/self.Iyy, np.cos(phi)*np.tan(theta)/self.Izz],
+                      [0, np.cos(phi)/self.Iyy, -np.sin(phi)/self.Izz],
+                      [0, np.sin(phi)*np.cos(theta)/self.Iyy, np.cos(phi)*np.cos(theta)/self.Izz]])
+
+        u = -K@np.concatenate((ang_error, ang_vel_error), axis=0)
 
         #Optimal input
         tau_x = float(u[0])
@@ -144,6 +196,71 @@ class Controller:
 
         return tau_x, tau_y, tau_z
     
+
+    def att_control_PD(self, ang_atual, ang_vel_atual, ang_des):
+        
+        phi = float(ang_atual[0])
+        theta = float(ang_atual[1])
+        psi = float(ang_atual[2])
+
+        #PID gains
+        Kp = np.array([[180, 0 ,0],
+                       [0, 180, 0],
+                       [0, 0, 40]])
+        Kd = np.array([[50, 0, 0],
+                       [0, 50, 0],
+                       [0, 0, 20]])
+        
+        angle_error = ang_des - ang_atual
+        ang_vel_error = np.zeros((3,1)) - ang_vel_atual
+        #Compute Optimal Control Law
+
+        T = np.array([[1/self.Ixx, np.sin(phi)*np.tan(theta)/self.Iyy, np.cos(phi)*np.tan(theta)/self.Izz],
+                      [0, np.cos(phi)/self.Iyy, -np.sin(phi)/self.Izz],
+                      [0, np.sin(phi)*np.cos(theta)/self.Iyy, np.cos(phi)*np.cos(theta)/self.Izz]])
+
+        u = np.linalg.inv(T)@(Kp@angle_error + Kd@ang_vel_error)
+
+        #Optimal input
+        tau_x = float(u[0])
+        tau_y = float(u[1])
+        tau_z = float(u[2])
+
+        return tau_x, tau_y, tau_z
+    
+    def pos_control_PD(self, pos_atual, pos_des, vel_atual, vel_des, accel_des, psi):
+
+        #PD gains
+        Kp = np.array([[0.5, 0 ,0],
+                       [0, 1, 0],
+                       [0, 0, 0.5]])*7.5
+        Kd = np.array([[2.5, 0, 0],
+                       [0, 2, 0],
+                       [0, 0, 0.5]])*4.8
+
+        dpos_error = pos_des - pos_atual
+
+        vel_error = vel_des - vel_atual
+
+        n = vel_des/np.linalg.norm(vel_des)
+        t = accel_des/np.linalg.norm(accel_des)
+        b = np.cross(t, n, axis=0)
+
+        if b is not NaN:
+            pos_error = dpos_error
+        else:
+            pos_error = (dpos_error.T@n)@n + (dpos_error.T@b)@b
+
+
+        rddot_c = accel_des + Kd@vel_error + Kp@pos_error
+
+        T = self.M*(self.G + rddot_c[2])
+
+        phi_des = (rddot_c[0]*np.sin(psi) - rddot_c[1]*np.cos(psi))/self.G
+        theta_des = (rddot_c[0]*np.cos(psi) + rddot_c[1]*np.sin(psi))/self.G
+
+        return T, phi_des, theta_des
+
     def quat2axis(self, q):
 
         qdv_mod = np.linalg.norm(q[1:4])
