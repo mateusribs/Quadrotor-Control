@@ -4,42 +4,30 @@ from sympy.matrices.expressions.blockmatrix import BlockMatrix
 
 
 
-m, g, omega, Ixx, Iyy, Izz, Ir = sym.symbols('m, g, omega, Ixx, Iyy, Izz, Ir', real=True)
+def polyT(n, k, t):
+
+    T = np.zeros((n,1))
+    D = np.zeros((n,1))
+
+    for i in range(0, n-1):
+        D[i] = i - 1
+        T[i] = 1
+    
+    for j in range(0, k-1):
+        for i in range(0, n-1):
+            T[i] = T[i]*D[i]
+
+            if D[i]>0:
+                D[i] = D[i] - 1
+            
+
+    for i in range(0, n-1):
+        T[i] = T[i]*t**D[i]
+    
+    T = T.T
+
+    return T
 
 
-A_a = sym.Matrix([[0, 0, 0, 0.5, 0, 0],
-                  [0, 0, 0, 0, 0.5, 0],
-                  [0, 0, 0, 0, 0, 0.5],
-                  [0, 0, 0, 0, Ir*omega/Ixx, 0],
-                  [0, 0, 0, -Ir*omega/Iyy, 0, 0],
-                  [0, 0, 0, 0, 0, 0]])
-
-B_a = sym.Matrix([[0, 0, 0],
-                  [0, 0, 0],
-                  [0, 0, 0],
-                  [1/Ixx, 0, 0],
-                  [0, 1/Iyy, 0],
-                  [0, 0, 1/Izz]])
-
-
-Mc = sym.Matrix(BlockMatrix([B_a, A_a*B_a, A_a**2*B_a, A_a**3*B_a, A_a**4*B_a, A_a**5*B_a]))
-print(Mc.rank())
-
-
-
-A_t = sym.Matrix([[0, 0, 0, 1, 0, 0],
-                  [0, 0, 0, 0, 1, 0],
-                  [0, 0, 0, 0, 0, 1],
-                  [0, 0, 0, 0, 0, 0],
-                  [0, 0, 0, 0, 0, 0],
-                  [0, 0, 0, 0, 0, 0]])
-
-B_t = sym.Matrix([[0, 0, 0],
-                  [0, 0, 0],
-                  [0, 0, 0],
-                  [g, 0, 0],
-                  [0, -g, 0],
-                  [0, 0, 1/m]])
-
-Mc_2 = sym.Matrix(BlockMatrix([B_t, A_t*B_t, A_t**2*B_t, A_t**3*B_t, A_t**4*B_t, A_t**5*B_t]))
-print(Mc_2.rank())
+T = polyT(8, 4, 1)
+print(T)

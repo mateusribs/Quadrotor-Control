@@ -1,3 +1,4 @@
+from operator import pos
 from numpy.core.defchararray import array
 from quadrotor_env import quad
 from quadrotor_control import Controller
@@ -39,57 +40,6 @@ pos_list = []
 quat_list = []
 ang_vel_list = []
 
-# for i in range(outer_length):
-
-#     #Position Control
-#     pos_ref = np.array([[x_ref[i], y_ref[i], z_ref[i]]]).T
-#     vel_ref = np.array([[dotx_ref[i], doty_ref[i], dotz_ref[i]]]).T
-#     accel_ref = np.array([[ddotx_ref[i], ddoty_ref[i], ddotz_ref[i]]]).T
-#     # print(pos_ref, pos_atual)
-#     psi = 0
-#     # print(quat_z)
-#     T, phi_des, theta_des = controller.pos_control_PD(pos_atual, pos_ref, vel_atual, vel_ref, accel_ref, psi)
-    
-#     ang_des = np.array([[float(phi_des), float(theta_des), float(psi)]]).T
-
-#     for j in range(inner_length):
-
-#         taux, tauy, tauz = controller.att_control_PD(ang_atual, ang_vel_atual, ang_des)
-
-#         action = np.array([float(T), taux, tauy, tauz])
-#         x, _, _ = quad_model.step(action)
-        
-#         ang = quad_model.ang
-#         ang_vel = quad_model.ang_vel
-
-#         pos_atual = np.array([[x[0], x[2], x[4]]]).T
-#         vel_atual = np.array([[x[1], x[3], x[5]]]).T
-#         ang_atual = np.array([[ang[0], ang[1], ang[2]]]).T
-#         ang_vel_atual = np.array([[ang_vel[0], ang_vel[1], ang_vel[2]]]).T
-
-#     # print("Posição:", pos_atual.T)
-#     # print("Atitude Atual:", ang_atual.T)
-     
-
-#         # print(q_atual.T)
-
-#     pos_list.append(pos_atual)
-#     quat_list.append(ang_atual)
-#     ang_vel_list.append(ang_vel_atual)        
-
-
-# t = np.arange(0, 101, 1)
-
-# pos_states = np.asarray(pos_list).reshape(101, 3)
-# quat_states = np.asarray(quat_list).reshape(101,3)
-# ang_vel = np.asarray(ang_vel_list).reshape(101,3)
-
-
-#Attitude Controller Test
-
-
-# qd = np.array([[0.996, 0.087, 0, 0]]).T
-ang_des = np.array([[0.174533, 0.174533, 0]]).T
 
 Qa = np.array([[15, 0, 0, 0, 0, 0],
                 [0, 15, 0, 0, 0, 0],
@@ -98,36 +48,114 @@ Qa = np.array([[15, 0, 0, 0, 0, 0],
                 [0, 0, 0, 0, 1, 0],
                 [0, 0, 0, 0, 0, 5]])*150
     
-Ra = np.diag(np.ones(3))*40
+Ra = np.diag(np.ones(3))*30
 
-_, _, Aa, Ba = controller.linearized_matrices(False)
-K = controller.LQR_gain(Aa, Ba, Qa, Ra)
+At, Bt, Aa, Ba = controller.linearized_matrices(False)
+Ka = controller.LQR_gain(Aa, Ba, Qa, Ra)
 
-for i in range(0, 100):
 
-    taux, tauy, tauz = controller.att_control(ang_atual, ang_des, ang_vel_atual, K)
-
-    _, _, _ = controller.att_control_PD(ang_atual, ang_vel_atual, ang_des)
-
-    action = np.array([9.81*1.03, taux, tauy, tauz])
+Qt = np.array([[15e-7, 0, 0, 0, 0, 0],
+                [0, 15e-7, 0, 0, 0, 0],
+                [0, 0, 15e-7, 0, 0, 0],
+                [0, 0, 0, 2.15, 0, 0],
+                [0, 0, 0, 0, 2.15, 0],
+                [0, 0, 0, 0, 0, 2.15]])*300
     
-    x, _, _ = quad_model.step(action)
+Rt = np.diag(np.ones(3))*10
+
+Kt = controller.LQR_gain(At, Bt, Qt, Rt)
+
+for i in range(outer_length):
+
+    #Position Control
+    pos_ref = np.array([[x_ref[i], y_ref[i], z_ref[i]]]).T
+    vel_ref = np.array([[dotx_ref[i], doty_ref[i], dotz_ref[i]]]).T
+    accel_ref = np.array([[ddotx_ref[i], ddoty_ref[i], ddotz_ref[i]]]).T
+    # print(pos_ref, pos_atual)
+    psi = 0
+    # print(quat_z)
+    T, phi_des, theta_des = controller.pos_control(pos_atual, pos_ref, vel_atual, vel_ref, accel_ref, psi, Kt)
+
+    _, _, _ = controller.pos_control_PD(pos_atual, pos_ref, vel_atual, vel_ref, accel_ref, psi)
     
-    ang = quad_model.ang
-    ang_vel = quad_model.ang_vel
-    # q_atual = np.array([[x[6], x[7], x[8], x[9]]]).T
-    # print('q atual:', q_atual.T)
-    ang_atual = np.array([[ang[0], ang[1], ang[2]]]).T
-    ang_vel_atual = np.array([[ang_vel[0], ang_vel[1], ang_vel[2]]]).T
-    print('Atitude:', ang_atual.T)
-    print('Velocidade Angular: ', ang_vel_atual.T)
+    ang_des = np.array([[float(phi_des), float(theta_des), float(psi)]]).T
+
+    for j in range(inner_length):
+
+        taux, tauy, tauz = controller.att_control(ang_atual, ang_des, ang_vel_atual, Ka)
+
+        action = np.array([float(T), taux, tauy, tauz])
+        x, _, _ = quad_model.step(action)
+        
+        ang = quad_model.ang
+        ang_vel = quad_model.ang_vel
+
+        pos_atual = np.array([[x[0], x[2], x[4]]]).T
+        vel_atual = np.array([[x[1], x[3], x[5]]]).T
+        ang_atual = np.array([[ang[0], ang[1], ang[2]]]).T
+        ang_vel_atual = np.array([[ang_vel[0], ang_vel[1], ang_vel[2]]]).T
+
+    # print("Posição:", pos_atual.T)
+    # print("Atitude Atual:", ang_atual.T)
+     
+
+        # print(q_atual.T)
+
+    pos_list.append(pos_atual)
     quat_list.append(ang_atual)
-    ang_vel_list.append(ang_vel_atual)   
-    # print(q_atual.T)
+    ang_vel_list.append(ang_vel_atual)        
 
-t = np.arange(0, 100, 1)
-quat_states = np.asarray(quat_list).reshape(100,3)
-ang_vel = np.asarray(ang_vel_list).reshape(100,3)
+
+t = np.arange(0, 101, 1)
+
+pos_states = np.asarray(pos_list).reshape(101, 3)
+quat_states = np.asarray(quat_list).reshape(101,3)
+ang_vel = np.asarray(ang_vel_list).reshape(101,3)
+
+
+#Attitude Controller Test
+
+
+# qd = np.array([[0.996, 0.087, 0, 0]]).T
+# ang_des = np.array([[0.174533, 0.174533, 0]]).T
+
+# Qa = np.array([[15, 0, 0, 0, 0, 0],
+#                 [0, 15, 0, 0, 0, 0],
+#                 [0, 0, 5, 0, 0, 0],
+#                 [0, 0, 0, 1, 0, 0],
+#                 [0, 0, 0, 0, 1, 0],
+#                 [0, 0, 0, 0, 0, 5]])*150
+    
+# Ra = np.diag(np.ones(3))*40
+
+# _, _, Aa, Ba = controller.linearized_matrices(False)
+# K = controller.LQR_gain(Aa, Ba, Qa, Ra)
+
+# for i in range(0, 100):
+
+#     taux, tauy, tauz = controller.att_control(ang_atual, ang_des, ang_vel_atual, K)
+
+#     _, _, _ = controller.att_control_PD(ang_atual, ang_vel_atual, ang_des)
+
+#     action = np.array([9.81*1.03, taux, tauy, tauz])
+    
+#     x, _, _ = quad_model.step(action)
+    
+#     ang = quad_model.ang
+#     ang_vel = quad_model.ang_vel
+#     # q_atual = np.array([[x[6], x[7], x[8], x[9]]]).T
+#     # print('q atual:', q_atual.T)
+#     ang_atual = np.array([[ang[0], ang[1], ang[2]]]).T
+#     ang_vel_atual = np.array([[ang_vel[0], ang_vel[1], ang_vel[2]]]).T
+#     print('Atitude:', ang_atual.T)
+#     print('Velocidade Angular: ', ang_vel_atual.T)
+#     quat_list.append(ang_atual)
+#     ang_vel_list.append(ang_vel_atual)   
+#     # print(q_atual.T)
+
+# t = np.arange(0, 100, 1)
+# quat_states = np.asarray(quat_list).reshape(100,3)
+# ang_vel = np.asarray(ang_vel_list).reshape(100,3)
 
 # print(quat_states[:,0])
 
@@ -135,21 +163,21 @@ ang_vel = np.asarray(ang_vel_list).reshape(100,3)
 
 
 # #Plot states
-# fig1, (x, y, z) = plt.subplots(3, 1, figsize=(15,15))
-# x.plot(t, pos_states[:,0], 'r', label=r'$x(t)$')
-# y.plot(t, pos_states[:,1], 'b', label=r'$y(t)$')
-# z.plot(t, pos_states[:,2], 'g', label=r'$z(t)$')
-# x.plot(t, x_ref, 'r--', label=r'$x_{ref}(t)$')
-# y.plot(t, y_ref, 'b--', label=r'$y_{ref}(t)$')
-# z.plot(t, z_ref, 'g--', label=r'$z_{ref}(t)$')
+fig1, (x, y, z) = plt.subplots(3, 1, figsize=(15,15))
+x.plot(t, pos_states[:,0], 'r', label=r'$x(t)$')
+y.plot(t, pos_states[:,1], 'b', label=r'$y(t)$')
+z.plot(t, pos_states[:,2], 'g', label=r'$z(t)$')
+x.plot(t, x_ref, 'r--', label=r'$x_{ref}(t)$')
+y.plot(t, y_ref, 'b--', label=r'$y_{ref}(t)$')
+z.plot(t, z_ref, 'g--', label=r'$z_{ref}(t)$')
 
-# x.grid()
-# y.grid()
-# z.grid()
+x.grid()
+y.grid()
+z.grid()
 
-# x.legend()
-# y.legend()
-# z.legend()
+x.legend()
+y.legend()
+z.legend()
 
 
 # fig2, (dx, dy, dz) = plt.subplots(3, 1, figsize=(15,15))
@@ -178,9 +206,9 @@ q2.plot(t, quat_states[:,2], 'g', label=r'$q_{2}(t)$')
 # q2.plot(t, quat_states[:,2], 'g', label=r'$q_{2}(t)$')
 # q3.plot(t, quat_states[:,3], 'y', label=r'$q_{3}(t)$')
 
-q0.plot(t, ang_des[0]*np.ones((100,1)), 'r--', label=r'$q_{0}(t)$')
-q1.plot(t, ang_des[1]*np.ones((100,1)), 'b--', label=r'$q_{1}(t)$')
-q2.plot(t, ang_des[2]*np.ones((100,1)), 'g--', label=r'$q_{2}(t)$')
+# q0.plot(t, ang_des[0]*np.ones((100,1)), 'r--', label=r'$q_{0}(t)$')
+# q1.plot(t, ang_des[1]*np.ones((100,1)), 'b--', label=r'$q_{1}(t)$')
+# q2.plot(t, ang_des[2]*np.ones((100,1)), 'g--', label=r'$q_{2}(t)$')
 # q3.plot(t, qd[3]*np.ones((50,1)), 'y--', label=r'$q_{3}(t)$')
 
 q0.grid()

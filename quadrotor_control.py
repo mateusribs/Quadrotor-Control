@@ -156,20 +156,31 @@ class Controller:
         return x, x_dot, x_dot_dot, y, y_dot, y_dot_dot, z, z_dot, z_dot_dot, psiInt
     
     
-    def pos_control(self, pos_atual, pos_des, vel_atual, vel_des, K):
+    def pos_control(self, pos_atual, pos_des, vel_atual, vel_des, accel_des, psi, K):
 
         #Compute error
-        pos_error = pos_des - pos_atual
+        dpos_error = pos_des - pos_atual
         vel_error = vel_des - vel_atual
 
+        n = vel_des/np.linalg.norm(vel_des)
+        t = accel_des/np.linalg.norm(accel_des)
+        b = np.cross(t, n, axis=0)
+
+        if b is not NaN:
+            pos_error = dpos_error
+        else:
+            pos_error = (dpos_error.T@n)@n + (dpos_error.T@b)@b
 
         # print(pos_error.T)
         #Compute Optimal Control Law
         u = -K@np.concatenate((pos_error, vel_error), axis=0)
         
-        
+        T = self.M*(self.G + u[2])
 
-        return dT, qd
+        phi_des = (u[0]*np.sin(psi) - u[1]*np.cos(psi))/self.G
+        theta_des = (u[0]*np.cos(psi) + u[1]*np.sin(psi))/self.G
+
+        return T, phi_des, theta_des
     
     def att_control(self, ang_atual, ang_des, ang_vel_atual, K):
 
