@@ -1,3 +1,4 @@
+from fds import equation_accel, equation_snap, polyT
 import numpy as np
 from numpy.core.numeric import NaN
 from quaternion_euler_utility import deriv_quat
@@ -32,6 +33,59 @@ class Controller:
         self.ed2_ant = 0
         self.ed3_ant = 0
     
+    def trajectory_generator(self, radius, frequency, max_h, min_h):
+        
+        t = np.arange(0, self.total_t + self.Ts*self.il, self.Ts*self.il)
+
+        d_height = max_h - min_h
+
+        # Define the x, y, z dimensions for the drone trajectories
+        alpha = 2*np.pi*frequency*t
+
+        # Trajectory 1
+        x = radius*np.cos(alpha)
+        y = radius*np.sin(alpha)*0
+        z = min_h + d_height/(t[-1])*t
+
+        x_dot = -radius*np.sin(alpha)*2*np.pi*frequency
+        y_dot = radius*np.cos(alpha)*2*np.pi*frequency*0
+        z_dot = d_height/(t[-1])*np.ones(len(t))
+
+        x_dot_dot = -radius*np.cos(alpha)*(2*np.pi*frequency)**2
+        y_dot_dot = -radius*np.sin(alpha)*(2*np.pi*frequency)**2*0
+        z_dot_dot = 0*np.ones(len(t))
+
+        # Vector of x and y changes per sample time
+        dx = x[1:len(x)]-x[0:len(x)-1]
+        dy = y[1:len(y)]-y[0:len(y)-1]
+        dz = z[1:len(z)]-z[0:len(z)-1]
+
+        dx = np.append(np.array(dx[0]),dx)
+        dy = np.append(np.array(dy[0]),dy)
+        dz = np.append(np.array(dz[0]),dz)
+
+        # Define the reference yaw angles
+        psi=np.zeros(len(x))
+        psiInt=psi
+        psi[0]=np.arctan2(y[0],x[0])+np.pi/2
+        psi[1:len(psi)]=np.arctan2(dy[1:len(dy)],dx[1:len(dx)])
+
+        # We want the yaw angle to keep track the amount of rotations
+        dpsi=psi[1:len(psi)]-psi[0:len(psi)-1]
+        psiInt[0]=psi[0]
+        for i in range(1,len(psiInt)):
+            if dpsi[i-1]<-np.pi:
+                psiInt[i]=psiInt[i-1]+(dpsi[i-1]+2*np.pi)
+            elif dpsi[i-1]>np.pi:
+                psiInt[i]=psiInt[i-1]+(dpsi[i-1]-2*np.pi)
+            else:
+                psiInt[i]=psiInt[i-1]+dpsi[i-1]
+
+
+        return x, x_dot, x_dot_dot, y, y_dot, y_dot_dot, z, z_dot, z_dot_dot, psiInt
+
+    ######################################### LQR CONTROL APPROACH ############################################################
+
     def linearized_matrices(self, quaternion = True):
 
         if quaternion:
@@ -104,58 +158,6 @@ class Controller:
     
         return K
 
-    def trajectory_generator(self, radius, frequency, max_h, min_h):
-        
-        t = np.arange(0, self.total_t + self.Ts*self.il, self.Ts*self.il)
-
-        d_height = max_h - min_h
-
-        # Define the x, y, z dimensions for the drone trajectories
-        alpha = 2*np.pi*frequency*t
-
-        # Trajectory 1
-        x = radius*np.cos(alpha)
-        y = radius*np.sin(alpha)*0
-        z = min_h + d_height/(t[-1])*t
-
-        x_dot = -radius*np.sin(alpha)*2*np.pi*frequency
-        y_dot = radius*np.cos(alpha)*2*np.pi*frequency*0
-        z_dot = d_height/(t[-1])*np.ones(len(t))
-
-        x_dot_dot = -radius*np.cos(alpha)*(2*np.pi*frequency)**2
-        y_dot_dot = -radius*np.sin(alpha)*(2*np.pi*frequency)**2*0
-        z_dot_dot = 0*np.ones(len(t))
-
-        # Vector of x and y changes per sample time
-        dx = x[1:len(x)]-x[0:len(x)-1]
-        dy = y[1:len(y)]-y[0:len(y)-1]
-        dz = z[1:len(z)]-z[0:len(z)-1]
-
-        dx = np.append(np.array(dx[0]),dx)
-        dy = np.append(np.array(dy[0]),dy)
-        dz = np.append(np.array(dz[0]),dz)
-
-        # Define the reference yaw angles
-        psi=np.zeros(len(x))
-        psiInt=psi
-        psi[0]=np.arctan2(y[0],x[0])+np.pi/2
-        psi[1:len(psi)]=np.arctan2(dy[1:len(dy)],dx[1:len(dx)])
-
-        # We want the yaw angle to keep track the amount of rotations
-        dpsi=psi[1:len(psi)]-psi[0:len(psi)-1]
-        psiInt[0]=psi[0]
-        for i in range(1,len(psiInt)):
-            if dpsi[i-1]<-np.pi:
-                psiInt[i]=psiInt[i-1]+(dpsi[i-1]+2*np.pi)
-            elif dpsi[i-1]>np.pi:
-                psiInt[i]=psiInt[i-1]+(dpsi[i-1]-2*np.pi)
-            else:
-                psiInt[i]=psiInt[i-1]+dpsi[i-1]
-
-
-        return x, x_dot, x_dot_dot, y, y_dot, y_dot_dot, z, z_dot, z_dot_dot, psiInt
-    
-    
     def pos_control(self, pos_atual, pos_des, vel_atual, vel_des, accel_des, psi, K):
 
         #Compute error
@@ -206,7 +208,8 @@ class Controller:
         tau_z = float(u[2])
 
         return tau_x, tau_y, tau_z
-    
+        
+    ######################################## PID CONTROL APPROACH #############################################################    
 
     def att_control_PD(self, ang_atual, ang_vel_atual, ang_des):
         
@@ -272,14 +275,327 @@ class Controller:
 
         return T, phi_des, theta_des
 
-    def quat2axis(self, q):
 
-        qdv_mod = np.linalg.norm(q[1:4])
 
-        if qdv_mod != 0:
-            theta = 2*(q[1:4]/qdv_mod)*np.arccos(q[0])
-        elif qdv_mod == 0:
-            theta = np.zeros((3,1))
+    #################################### TRAJECTORY PLANNER FUNCTIONS ######################################################
+    
+    #Returns the derivatives
+    def polyT(self, n, k, t):
+
+        T = np.zeros((n,1))
+        D = np.zeros((n,1))
+
+        for i in range(1, n+1):
+            D[i-1] = i - 1
+            T[i-1] = 1
+
+        for j in range(1, k+1):
+            for i in range(1, n+1):
+                T[i-1] = T[i-1]*D[i-1]
+
+                if D[i-1]>0:
+                    D[i-1] = D[i-1] - 1
+                
+
+        for i in range(1, n+1):
+            T[i-1] = T[i-1]*t**D[i-1]
         
-        return theta
+        T = T.T
+
+        return T
+
+    #Get the optimal snap functions coefficients 
+    def getCoeff_snap(self, waypoints, t):
+
+        n = len(waypoints) - 1
+        A = np.zeros((8*n, 8*n))
+        b = np.zeros((8*n, 1))
+
+        # print(b.T)
+
+        row = 0
+        #Initial constraints
+        for i in range(0, 1):
+            A[row, 8*(i):8*(i+1)] = polyT(8, 0, t[0])
+            b[i, 0] = waypoints[0]
+            row = row + 1
+        
+        for k in range(1, 4):
+            A[row, 0:8] = polyT(8, k, t[0])
+            row = row + 1
+        
+        if n == 1:
+            #Last P constraints
+            for i in range(0, 1):
+                A[row, 8*(i):8*(i+1)] = polyT(8, 0, t[-1])
+                b[row, 0] = waypoints[1]
+                row = row + 1  
+            
+            for k in range(1, 4):
+                A[row, 8*(n) - 8:8*(n)] = polyT(8, k, t[-1])
+                row = row + 1
+
+
+
+        elif n>1:
+
+
+            #Pi constraints
+            shift = 0
+            for j in range(1, n):
+                
+                
+                
+                for i in range(0, 2):
+                    A[row, 8*(i+shift):8*(i+1+shift)] = polyT(8, 0, t[j])
+                    b[row, 0] = waypoints[j]
+
+                    row = row + 1
+
+                for k in range(1, 7):
+                    A[row, 8*(j-1):8*(j)] = polyT(8, k, t[j])
+                    A[row, 8*(j):8*(j+1)] = -polyT(8, k, t[j])
+                    row = row + 1
+                
+                shift += 1
+            
+            
+            #Last P constraints
+            for i in range(0, 1):
+                A[row, 8*(n) - 8:8*(n)] = polyT(8, 0, t[-1])
+                b[row, 0] = waypoints[n]
+                row = row + 1
+            
+            for k in range(1, 4):
+                A[row, 8*(n) - 8:8*(n)] = polyT(8, k, t[-1])
+                row = row + 1
+
+
+        coeff = np.linalg.inv(A)@b
+        
+        c_matrix = coeff.reshape(n, 8)
+
+        return A, b, c_matrix
+
+    #Compute the snap trajectory equations at time 't'
+    def equation_snap(self, t, c_matrix, eq_n):
+        x = polyT(8, 0, t)
+        v = polyT(8, 1, t)
+        a = polyT(8, 2, t)
+        j = polyT(8, 3, t)
+        s = polyT(8, 4, t)
+        
+
+        P = np.sum(x*c_matrix[eq_n,:])
+        V = np.sum(v*c_matrix[eq_n,:])
+        A = np.sum(a*c_matrix[eq_n,:])
+        J = np.sum(j*c_matrix[eq_n,:])
+        S = np.sum(s*c_matrix[eq_n,:])
+        
+
+        return P, V, A, J, S
+    
+    #Storage the values of any equations at time 't' in lists
+    def evaluate_equations_snap(self, t, step, c_matrix):
+            
+        skip = 0
+
+        x_list = []
+        v_list = []
+        a_list = []
+        j_list = []
+        s_list = []
+
+        for i in np.arange(0, t[-1], step):
+
+            if skip == 0:
+
+                if i >= t[skip] and i<=t[skip+1]:
+                
+                    p, v, a, j, s = equation_snap(i, c_matrix, skip)
+
+                    x_list.append(p)
+                    v_list.append(v)
+                    a_list.append(a)
+                    j_list.append(j)
+                    s_list.append(s)
+
+                else:
+
+                    skip += 1
+
+                    p, v, a, j, s = equation_snap(i, c_matrix, skip)
+
+                    x_list.append(p)
+                    v_list.append(v)
+                    a_list.append(a)
+                    j_list.append(j)
+                    s_list.append(s)
+
+            elif skip > 0 and skip < len(t):
+
+                if i > t[skip] and i <= t[skip+1]:
+
+                    p, v, a, j, s = equation_snap(i, c_matrix, skip)
+
+                    x_list.append(p)
+                    v_list.append(v)
+                    a_list.append(a)
+                    j_list.append(j)
+                    s_list.append(s)
+
+                else:
+
+                    skip += 1
+
+                    p, v, a, j, s = equation_snap(i, c_matrix, skip)
+
+                    x_list.append(p)
+                    v_list.append(v)
+                    a_list.append(a)
+                    j_list.append(j)
+                    s_list.append(s)
+        
+        return x_list, v_list, a_list, j_list, s_list
+
+
+    #Get the optimal acceleration functions coefficients 
+    def getCoeff_accel(self, waypoints, t):
+
+        n = len(waypoints) - 1
+        A = np.zeros((4*n, 4*n))
+        b = np.zeros((4*n, 1))
+
+        # print(b.T)
+
+        row = 0
+        #Initial constraints
+        for i in range(0, 1):
+            A[row, 4*(i):4*(i+1)] = polyT(4, 0, t[0])
+            b[i, 0] = waypoints[0]
+            row = row + 1
+        
+        for k in range(1, 2):
+            A[row, 0:4] = polyT(4, k, t[0])
+            row = row + 1
+        
+        if n == 1:
+            #Last P constraints
+            for i in range(0, 1):
+                A[row, 4*(i):4*(i+1)] = polyT(4, 0, t[-1])
+                b[row, 0] = waypoints[1]
+                row = row + 1  
+            
+            for k in range(1, 2):
+                A[row, 4*(n) - 4:4*(n)] = polyT(4, k, t[-1])
+                row = row + 1
+
+
+
+        elif n>1:
+
+
+            #Pi constraints
+            shift = 0
+            for j in range(1, n):
+                
+                
+                
+                for i in range(0, 2):
+                    A[row, 4*(i+shift):4*(i+1+shift)] = polyT(4, 0, t[j])
+                    b[row, 0] = waypoints[j]
+
+                    row = row + 1
+
+                for k in range(1, 3):
+                    A[row, 4*(j-1):4*(j)] = polyT(4, k, t[j])
+                    A[row, 4*(j):4*(j+1)] = -polyT(4, k, t[j])
+                    row = row + 1
+                
+                shift += 1
+            
+            
+            #Last P constraints
+            for i in range(0, 1):
+                A[row, 4*(n) - 4:4*(n)] = polyT(4, 0, t[-1])
+                b[row, 0] = waypoints[n]
+                row = row + 1
+            
+            for k in range(1, 2):
+                A[row, 4*(n) - 4:4*(n)] = polyT(4, k, t[-1])
+                row = row + 1
+
+
+        coeff = np.linalg.inv(A)@b
+        
+        c_matrix = coeff.reshape(n, 4)
+
+        return A, b, c_matrix
+
+    #Compute the acceleration trajectory equations at time 't'
+    def equation_accel(self, t, c_matrix, eq_n):
+        x = polyT(4, 0, t)
+        v = polyT(4, 1, t)
+        a = polyT(4, 2, t)
+
+        P = np.sum(x*c_matrix[eq_n,:])
+        V = np.sum(v*c_matrix[eq_n,:])
+        A = np.sum(a*c_matrix[eq_n,:])
+        
+
+        return P, V, A
+
+    #Storage the values of any equations at time 't' in lists
+    def evaluate_equations_accel(self, t, step, c_matrix):
+            
+        skip = 0
+
+        x_list = []
+        v_list = []
+        a_list = []
+
+        for i in np.arange(0, t[-1], step):
+
+            if skip == 0:
+
+                if i >= t[skip] and i<=t[skip+1]:
+                
+                    p, v, a = equation_accel(i, c_matrix, skip)
+
+                    x_list.append(p)
+                    v_list.append(v)
+                    a_list.append(a)
+
+                else:
+
+                    skip += 1
+
+                    p, v, a = equation_accel(i, c_matrix, skip)
+
+                    x_list.append(p)
+                    v_list.append(v)
+                    a_list.append(a)
+
+            elif skip > 0 and skip < len(t):
+
+                if i > t[skip] and i <= t[skip+1]:
+
+                    p, v, a = equation_accel(i, c_matrix, skip)
+
+                    x_list.append(p)
+                    v_list.append(v)
+                    a_list.append(a)
+
+                else:
+
+                    skip += 1
+
+                    p, v, a = equation_accel(i, c_matrix, skip)
+
+                    x_list.append(p)
+                    v_list.append(v)
+                    a_list.append(a)
+        
+        return x_list, v_list, a_list
+
 
