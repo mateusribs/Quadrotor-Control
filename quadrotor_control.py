@@ -168,7 +168,7 @@ class Controller:
         t = accel_des/np.linalg.norm(accel_des)
         b = np.cross(t, n, axis=0)
 
-        if b is not NaN:
+        if np.isnan(b).any:
             pos_error = dpos_error
         else:
             pos_error = (dpos_error.T@n)@n + (dpos_error.T@b)@b
@@ -193,6 +193,7 @@ class Controller:
         #Compute error
         
         ang_error = ang_des - ang_atual
+        print("Erro angulo:", ang_error.T)
         ang_vel_error = np.zeros((3,1)) - ang_vel_atual
 
         #Compute Optimal Control Law
@@ -218,14 +219,15 @@ class Controller:
         psi = float(ang_atual[2])
 
         #PID gains
-        Kp = np.array([[180, 0 ,0],
-                       [0, 180, 0],
-                       [0, 0, 40]])
+        Kp = np.array([[200, 0 ,0],
+                       [0, 200, 0],
+                       [0, 0, 100]])*8
         Kd = np.array([[50, 0, 0],
                        [0, 50, 0],
-                       [0, 0, 20]])
+                       [0, 0, 35]])*1.1
         
         angle_error = ang_des - ang_atual
+        print('Erro angulo:', angle_error.T)
         ang_vel_error = np.zeros((3,1)) - ang_vel_atual
         #Compute Optimal Control Law
 
@@ -245,12 +247,12 @@ class Controller:
     def pos_control_PD(self, pos_atual, pos_des, vel_atual, vel_des, accel_des, psi):
 
         #PD gains
-        Kp = np.array([[0.5, 0 ,0],
-                       [0, 1, 0],
-                       [0, 0, 0.5]])*7.5
-        Kd = np.array([[2.5, 0, 0],
+        Kp = np.array([[4, 0 ,0],
                        [0, 2, 0],
-                       [0, 0, 0.5]])*4.8
+                       [0, 0, 9.5]])*10.5
+        Kd = np.array([[4.5, 0, 0],
+                       [0, 4, 0],
+                       [0, 0, 4]])*3.8
 
         dpos_error = pos_des - pos_atual
 
@@ -260,7 +262,7 @@ class Controller:
         t = accel_des/np.linalg.norm(accel_des)
         b = np.cross(t, n, axis=0)
 
-        if b is not NaN:
+        if np.isnan(b).any:
             pos_error = dpos_error
         else:
             pos_error = (dpos_error.T@n)@n + (dpos_error.T@b)@b

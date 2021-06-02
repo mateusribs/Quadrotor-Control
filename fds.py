@@ -320,30 +320,30 @@ def evaluate_equations_accel(t, c_matrix):
     return x_list, v_list, a_list
 
 
-x_wp = np.array([[0, 1, 2, 0, 1, 2]]).T
-y_wp = np.array([[0, 2, 4, 5, 6, 7]]).T
-z_wp = np.array([[0, 0.5, 1, 1.5, 2, 2.5]]).T
+x_wp = np.array([[0, 1, 1, 1, 2]]).T
+y_wp = np.array([[0, 0.5, 1, 1.5, 2.5]]).T
+z_wp = np.array([[0, 1, 2, 3, 4]]).T
 psi_wp = np.array([[0, np.pi, 2*np.pi]]).T
 
-t = [0, 1, 2]
+t = [0, 1, 2, 3, 4]
 
-# _, _, x_matrix = getCoeff_snap(x_wp, t)
-# _, _, y_matrix = getCoeff_snap(y_wp, t)
-# _, _, z_matrix = getCoeff_snap(z_wp, t)
+_, _, x_matrix = getCoeff_snap(x_wp, t)
+_, _, y_matrix = getCoeff_snap(y_wp, t)
+_, _, z_matrix = getCoeff_snap(z_wp, t)
 
-# px, vx, ax, jx, sx = evaluate_equations_snap(t, x_matrix)
-# py, vy, ay, jy, sy = evaluate_equations_snap(t, y_matrix)
-# pz, vz, az, jz, sz = evaluate_equations_snap(t, z_matrix)
+px, vx, ax, jx, sx = evaluate_equations_snap(t, x_matrix)
+py, vy, ay, jy, sy = evaluate_equations_snap(t, y_matrix)
+pz, vz, az, jz, sz = evaluate_equations_snap(t, z_matrix)
 
-_, _, psi_matrix = getCoeff_accel(psi_wp, t)
-psi, vpsi, apsi = evaluate_equations_accel(t, psi_matrix)
+# _, _, psi_matrix = getCoeff_accel(psi_wp, t)
+# psi, vpsi, apsi = evaluate_equations_accel(t, psi_matrix)
 
-t1 = np.arange(0, t[-1], 0.01)
+# t1 = np.arange(0, t[-1], 0.01)
 
-fig, (p, v, a) = plt.subplots(3, 1, figsize=(9,9))
-p.plot(t1, psi)
-v.plot(t1, vpsi)
-a.plot(t1, apsi)
+# fig, (p, v, a) = plt.subplots(3, 1, figsize=(9,9))
+# p.plot(t1, psi)
+# v.plot(t1, vpsi)
+# a.plot(t1, apsi)
 
 # fig, (p, v, a, j, s) = plt.subplots(5,1, figsize=(9,9))
 # p.plot(t1, px)
@@ -381,8 +381,8 @@ a.plot(t1, apsi)
 # j3.grid()
 # s3.grid()
 
-# fig = plt.figure()
-# ax = plt.axes(projection='3d')
-# ax.plot3D(px, py, pz, 'green')
+fig = plt.figure()
+ax = plt.axes(projection='3d')
+ax.plot3D(px, py, pz, 'green')
 
 plt.show()
