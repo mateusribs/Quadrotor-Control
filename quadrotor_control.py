@@ -1,4 +1,3 @@
-from fds import equation_accel, equation_snap, polyT
 import numpy as np
 from numpy.core.numeric import NaN
 from quaternion_euler_utility import deriv_quat
@@ -218,13 +217,21 @@ class Controller:
         theta = float(ang_atual[1])
         psi = float(ang_atual[2])
 
-        #PID gains
+        #PID gains unlimited
         Kp = np.array([[200, 0 ,0],
                        [0, 200, 0],
                        [0, 0, 100]])*8
         Kd = np.array([[50, 0, 0],
                        [0, 50, 0],
                        [0, 0, 35]])*1.1
+
+        # Kp = np.array([[15, 0 ,0],
+        #                [0, 15, 0],
+        #                [0, 0, 1]])*500
+        # Kd = np.array([[50, 0, 0],
+        #                [0, 50, 0],
+        #                [0, 0, 45]])*10
+        
         
         angle_error = ang_des - ang_atual
         print('Erro angulo:', angle_error.T)
@@ -246,13 +253,20 @@ class Controller:
     
     def pos_control_PD(self, pos_atual, pos_des, vel_atual, vel_des, accel_des, psi):
 
-        #PD gains
+        #PD gains unlimited
         Kp = np.array([[4, 0 ,0],
                        [0, 2, 0],
                        [0, 0, 9.5]])*10.5
         Kd = np.array([[4.5, 0, 0],
                        [0, 4, 0],
                        [0, 0, 4]])*3.8
+
+        # Kp = np.array([[200, 0 ,0],
+        #                [0, 200, 0],
+        #                [0, 0, 100]])*8
+        # Kd = np.array([[50, 0, 0],
+        #                [0, 50, 0],
+        #                [0, 0, 35]])*1.1
 
         dpos_error = pos_des - pos_atual
 
@@ -318,23 +332,23 @@ class Controller:
         row = 0
         #Initial constraints
         for i in range(0, 1):
-            A[row, 8*(i):8*(i+1)] = polyT(8, 0, t[0])
+            A[row, 8*(i):8*(i+1)] = self.polyT(8, 0, t[0])
             b[i, 0] = waypoints[0]
             row = row + 1
         
         for k in range(1, 4):
-            A[row, 0:8] = polyT(8, k, t[0])
+            A[row, 0:8] = self.polyT(8, k, t[0])
             row = row + 1
         
         if n == 1:
             #Last P constraints
             for i in range(0, 1):
-                A[row, 8*(i):8*(i+1)] = polyT(8, 0, t[-1])
+                A[row, 8*(i):8*(i+1)] = self.polyT(8, 0, t[-1])
                 b[row, 0] = waypoints[1]
                 row = row + 1  
             
             for k in range(1, 4):
-                A[row, 8*(n) - 8:8*(n)] = polyT(8, k, t[-1])
+                A[row, 8*(n) - 8:8*(n)] = self.polyT(8, k, t[-1])
                 row = row + 1
 
 
@@ -349,14 +363,14 @@ class Controller:
                 
                 
                 for i in range(0, 2):
-                    A[row, 8*(i+shift):8*(i+1+shift)] = polyT(8, 0, t[j])
+                    A[row, 8*(i+shift):8*(i+1+shift)] = self.polyT(8, 0, t[j])
                     b[row, 0] = waypoints[j]
 
                     row = row + 1
 
                 for k in range(1, 7):
-                    A[row, 8*(j-1):8*(j)] = polyT(8, k, t[j])
-                    A[row, 8*(j):8*(j+1)] = -polyT(8, k, t[j])
+                    A[row, 8*(j-1):8*(j)] = self.polyT(8, k, t[j])
+                    A[row, 8*(j):8*(j+1)] = -self.polyT(8, k, t[j])
                     row = row + 1
                 
                 shift += 1
@@ -364,12 +378,12 @@ class Controller:
             
             #Last P constraints
             for i in range(0, 1):
-                A[row, 8*(n) - 8:8*(n)] = polyT(8, 0, t[-1])
+                A[row, 8*(n) - 8:8*(n)] = self.polyT(8, 0, t[-1])
                 b[row, 0] = waypoints[n]
                 row = row + 1
             
             for k in range(1, 4):
-                A[row, 8*(n) - 8:8*(n)] = polyT(8, k, t[-1])
+                A[row, 8*(n) - 8:8*(n)] = self.polyT(8, k, t[-1])
                 row = row + 1
 
 
@@ -381,11 +395,11 @@ class Controller:
 
     #Compute the snap trajectory equations at time 't'
     def equation_snap(self, t, c_matrix, eq_n):
-        x = polyT(8, 0, t)
-        v = polyT(8, 1, t)
-        a = polyT(8, 2, t)
-        j = polyT(8, 3, t)
-        s = polyT(8, 4, t)
+        x = self.polyT(8, 0, t)
+        v = self.polyT(8, 1, t)
+        a = self.polyT(8, 2, t)
+        j = self.polyT(8, 3, t)
+        s = self.polyT(8, 4, t)
         
 
         P = np.sum(x*c_matrix[eq_n,:])
@@ -414,7 +428,7 @@ class Controller:
 
                 if i >= t[skip] and i<=t[skip+1]:
                 
-                    p, v, a, j, s = equation_snap(i, c_matrix, skip)
+                    p, v, a, j, s = self.equation_snap(i, c_matrix, skip)
 
                     x_list.append(p)
                     v_list.append(v)
@@ -426,7 +440,7 @@ class Controller:
 
                     skip += 1
 
-                    p, v, a, j, s = equation_snap(i, c_matrix, skip)
+                    p, v, a, j, s = self.equation_snap(i, c_matrix, skip)
 
                     x_list.append(p)
                     v_list.append(v)
@@ -438,7 +452,7 @@ class Controller:
 
                 if i > t[skip] and i <= t[skip+1]:
 
-                    p, v, a, j, s = equation_snap(i, c_matrix, skip)
+                    p, v, a, j, s = self.equation_snap(i, c_matrix, skip)
 
                     x_list.append(p)
                     v_list.append(v)
@@ -450,7 +464,7 @@ class Controller:
 
                     skip += 1
 
-                    p, v, a, j, s = equation_snap(i, c_matrix, skip)
+                    p, v, a, j, s = self.equation_snap(i, c_matrix, skip)
 
                     x_list.append(p)
                     v_list.append(v)
@@ -473,23 +487,23 @@ class Controller:
         row = 0
         #Initial constraints
         for i in range(0, 1):
-            A[row, 4*(i):4*(i+1)] = polyT(4, 0, t[0])
+            A[row, 4*(i):4*(i+1)] = self.polyT(4, 0, t[0])
             b[i, 0] = waypoints[0]
             row = row + 1
         
         for k in range(1, 2):
-            A[row, 0:4] = polyT(4, k, t[0])
+            A[row, 0:4] = self.polyT(4, k, t[0])
             row = row + 1
         
         if n == 1:
             #Last P constraints
             for i in range(0, 1):
-                A[row, 4*(i):4*(i+1)] = polyT(4, 0, t[-1])
+                A[row, 4*(i):4*(i+1)] = self.polyT(4, 0, t[-1])
                 b[row, 0] = waypoints[1]
                 row = row + 1  
             
             for k in range(1, 2):
-                A[row, 4*(n) - 4:4*(n)] = polyT(4, k, t[-1])
+                A[row, 4*(n) - 4:4*(n)] = self.polyT(4, k, t[-1])
                 row = row + 1
 
 
@@ -504,14 +518,14 @@ class Controller:
                 
                 
                 for i in range(0, 2):
-                    A[row, 4*(i+shift):4*(i+1+shift)] = polyT(4, 0, t[j])
+                    A[row, 4*(i+shift):4*(i+1+shift)] = self.polyT(4, 0, t[j])
                     b[row, 0] = waypoints[j]
 
                     row = row + 1
 
                 for k in range(1, 3):
-                    A[row, 4*(j-1):4*(j)] = polyT(4, k, t[j])
-                    A[row, 4*(j):4*(j+1)] = -polyT(4, k, t[j])
+                    A[row, 4*(j-1):4*(j)] = self.polyT(4, k, t[j])
+                    A[row, 4*(j):4*(j+1)] = -self.polyT(4, k, t[j])
                     row = row + 1
                 
                 shift += 1
@@ -519,12 +533,12 @@ class Controller:
             
             #Last P constraints
             for i in range(0, 1):
-                A[row, 4*(n) - 4:4*(n)] = polyT(4, 0, t[-1])
+                A[row, 4*(n) - 4:4*(n)] = self.polyT(4, 0, t[-1])
                 b[row, 0] = waypoints[n]
                 row = row + 1
             
             for k in range(1, 2):
-                A[row, 4*(n) - 4:4*(n)] = polyT(4, k, t[-1])
+                A[row, 4*(n) - 4:4*(n)] = self.polyT(4, k, t[-1])
                 row = row + 1
 
 
@@ -536,9 +550,9 @@ class Controller:
 
     #Compute the acceleration trajectory equations at time 't'
     def equation_accel(self, t, c_matrix, eq_n):
-        x = polyT(4, 0, t)
-        v = polyT(4, 1, t)
-        a = polyT(4, 2, t)
+        x = self.polyT(4, 0, t)
+        v = self.polyT(4, 1, t)
+        a = self.polyT(4, 2, t)
 
         P = np.sum(x*c_matrix[eq_n,:])
         V = np.sum(v*c_matrix[eq_n,:])
@@ -562,7 +576,7 @@ class Controller:
 
                 if i >= t[skip] and i<=t[skip+1]:
                 
-                    p, v, a = equation_accel(i, c_matrix, skip)
+                    p, v, a = self.equation_accel(i, c_matrix, skip)
 
                     x_list.append(p)
                     v_list.append(v)
@@ -572,7 +586,7 @@ class Controller:
 
                     skip += 1
 
-                    p, v, a = equation_accel(i, c_matrix, skip)
+                    p, v, a = self.equation_accel(i, c_matrix, skip)
 
                     x_list.append(p)
                     v_list.append(v)
@@ -582,7 +596,7 @@ class Controller:
 
                 if i > t[skip] and i <= t[skip+1]:
 
-                    p, v, a = equation_accel(i, c_matrix, skip)
+                    p, v, a = self.equation_accel(i, c_matrix, skip)
 
                     x_list.append(p)
                     v_list.append(v)
@@ -592,7 +606,7 @@ class Controller:
 
                     skip += 1
 
-                    p, v, a = equation_accel(i, c_matrix, skip)
+                    p, v, a = self.equation_accel(i, c_matrix, skip)
 
                     x_list.append(p)
                     v_list.append(v)

@@ -381,8 +381,8 @@ pz, vz, az, jz, sz = evaluate_equations_snap(t, z_matrix)
 # j3.grid()
 # s3.grid()
 
-fig = plt.figure()
-ax = plt.axes(projection='3d')
-ax.plot3D(px, py, pz, 'green')
+# fig = plt.figure()
+# ax = plt.axes(projection='3d')
+# ax.plot3D(px, py, pz, 'green')
 
-plt.show()
+# plt.show()

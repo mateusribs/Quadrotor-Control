@@ -20,9 +20,9 @@ inner_length = 10
 controller = Controller(total_time = 10, sample_time = 0.01, inner_length = inner_length)
 
 x_wp = np.array([[0, 1, 1, 0, 0]]).T
-y_wp = np.array([[0, 1, 1, 0, 0]]).T
-z_wp = np.array([[0, 1, 0, 1, 1]]).T
-psi_wp = np.array([[0, np.pi, 2*np.pi]]).T
+y_wp = np.array([[0, 1, 1, 2, 2]]).T
+z_wp = np.array([[0, 1, 1.5, 2, 2.5]]).T
+psi_wp = np.array([[0, np.pi/12, np.pi/8, np.pi/4, np.pi]]).T
 
 t = [0, 2, 4, 6, 8]
 step = 0.1
@@ -30,11 +30,12 @@ step = 0.1
 _, _, x_matrix = controller.getCoeff_snap(x_wp, t)
 _, _, y_matrix = controller.getCoeff_snap(y_wp, t)
 _, _, z_matrix = controller.getCoeff_snap(z_wp, t)
+_, _, psi_matrix = controller.getCoeff_accel(psi_wp, t)
 
 x_ref, dotx_ref, ddotx_ref, _, _ = controller.evaluate_equations_snap(t, step, x_matrix)
 y_ref, doty_ref, ddoty_ref, _, _ = controller.evaluate_equations_snap(t, step, y_matrix)
 z_ref, dotz_ref, ddotz_ref, _, _ = controller.evaluate_equations_snap(t, step, z_matrix)
-
+psi_ref, _, _ = controller.evaluate_equations_accel(t, step, psi_matrix)
 
 # x_ref, dotx_ref, ddotx_ref, y_ref, doty_ref, ddoty_ref, z_ref, dotz_ref, ddotz_ref, psiInt = controller.trajectory_generator(radius=1, frequency=np.pi/15, max_h=7, min_h=4)
 outer_length = len(x_ref)
@@ -56,6 +57,7 @@ vel_list = []
 quat_list = []
 ang_vel_list = []
 ang_ref_list = []
+T_list = []
 
 
 # Qa = np.array([[450, 0, 0, 0, 0, 0],
@@ -93,7 +95,7 @@ for i in range(outer_length):
     vel_ref = np.array([[dotx_ref[i], doty_ref[i], dotz_ref[i]]]).T
     accel_ref = np.array([[ddotx_ref[i], ddoty_ref[i], ddotz_ref[i]]]).T
     # print(pos_ref, pos_atual)
-    psi = 0
+    psi = psi_ref[i]
     # print(quat_z)
     # T, phi_des, theta_des = controller.pos_control(pos_atual, pos_ref, vel_atual, vel_ref, accel_ref, psi, Kt)
 
@@ -117,7 +119,10 @@ for i in range(outer_length):
         ang_atual = np.array([[ang[0], ang[1], ang[2]]]).T
         ang_vel_atual = np.array([[ang_vel[0], ang_vel[1], ang_vel[2]]]).T
 
-    # print("Posição:", pos_atual.T)
+    print("Posição:", pos_atual.T)
+    print("Empuxo:", T)
+    print("Phi:", phi_des)
+    print("Theta:", theta_des)
     # print("Atitude Atual:", ang_atual.T)
      
 
@@ -127,7 +132,8 @@ for i in range(outer_length):
     vel_list.append(vel_atual)
     quat_list.append(ang_atual)
     ang_vel_list.append(ang_vel_atual)
-    ang_ref_list.append(ang_des)        
+    ang_ref_list.append(ang_des)
+    T_list.append(T)        
 
 
 t1 = np.arange(0, t[-1], step)
@@ -159,7 +165,7 @@ ang_refe = np.asarray(ang_ref_list).reshape(outer_length,3)
 # _, _, Aa, Ba = controller.linearized_matrices(False)
 # K = controller.LQR_gain(Aa, Ba, Qa, Ra)
 
-# ite = 10
+# ite = 20
 
 # for i in range(0, ite):
 
@@ -241,10 +247,13 @@ ph.grid()
 th.grid()
 ps.grid()
 
+fig5, emp = plt.subplots(1,1,figsize=(10,10))
+emp.plot(t1, T_list)
+emp.grid()
 
-fig6 = plt.figure()
-ax = plt.axes(projection='3d')
-ax.plot3D(x_ref, y_ref, z_ref, 'y')
-ax.plot3D(pos_states[:,0], pos_states[:,1], pos_states[:,2], 'g--')
+# fig6 = plt.figure()
+# ax = plt.axes(projection='3d')
+# ax.plot3D(x_ref, y_ref, z_ref, 'y')
+# ax.plot3D(pos_states[:,0], pos_states[:,1], pos_states[:,2], 'g--')
 
 plt.show()
