@@ -584,9 +584,9 @@ class sensor():
     """
     
     def __init__(self, env,
-                 accel_std = 0.1, accel_bias_drift = 0.0005,
-                 gyro_std = 0.035, gyro_bias_drift = 0.00015,
-                 magnet_std = 15, magnet_bias_drift = 0.075,
+                 accel_std = 0.1, accel_bias_drift = 0.0005, 
+                 gyro_std = 0.035, gyro_bias_drift = 0.00015, 
+                 magnet_std = 15, magnet_bias_drift = 0.075, 
                  gps_std_p = 1.71, gps_std_v=0.5):
         
         self.std = [accel_std, gyro_std, magnet_std, gps_std_p, gps_std_v]
@@ -594,8 +594,7 @@ class sensor():
         self.quad = env
         self.error = True
         self.bias_reset()
-        self.R = np.eye(3)
-
+   
     def bias_reset(self):        
         self.a_std = self.std[0]*self.error
         self.a_b_d = (np.random.random()-0.5)*2*self.b_d[0]*self.error        
@@ -605,10 +604,11 @@ class sensor():
         self.m_b_d = (np.random.random()-0.5)*2*self.b_d[2]*self.error        
         self.gps_std_p = self.std[3]*self.error
         self.gps_std_v = self.std[4]*self.error
+        self.R = np.eye(3)
     
         
     def accel(self):
-    
+        
         self.a_b_accel = self.a_b_accel + self.a_b_d*self.quad.t_step
 
         read_error = np.random.normal(self.a_b_accel, self.a_std, 3)
@@ -616,15 +616,63 @@ class sensor():
         read_accel_body = self.quad.accelerometer_read.flatten()
 
         return read_accel_body+read_error
+
     
+    def accel_grav(self, norm=True):
+        
+        gravity_vec = np.array([0, 0, -9.81])
+
+        self.a_b_grav = self.a_b_grav + self.a_b_d*self.quad.t_step
+        #Gravity vector as read from body sensor
+        gravity_body = np.dot(self.quad.mat_rot.T, gravity_vec)+ np.random.normal(np.random.random(3)*self.a_b_grav, self.a_std, 3)
+
+        if norm:
+
+            ax = gravity_body[0]
+            ay = gravity_body[1]
+            az = gravity_body[2]
+
+
+            if ax !=0 and ay != 0 and az != 0:
+
+                # Normalise accelerometer measurement
+                recipNorm = 1/(math.sqrt(ax * ax + ay * ay + az * az))
+                ax *= recipNorm
+                ay *= recipNorm
+                az *= recipNorm
+
+                gravity_body = np.array([[ax, ay, az]], dtype='float32')
+
+        return gravity_body
     
+    def mag_gauss(self, norm=True):
+
+        magnet_vec = np.array([-65.269, 165.115, -144.205])
+        self.m_b = self.m_b + self.m_b_d*self.quad.t_step
+        magnet_body = np.dot(self.quad.mat_rot.T, magnet_vec) + np.random.normal(np.random.random(3)*self.m_b, self.m_std, 3)
+
+        mx = magnet_body[0]
+        my = magnet_body[1]
+        mz = magnet_body[2]
+
+        if norm:
+            recipNorm = 1/math.sqrt(mx * mx + my * my + mz * mz)
+            mx *= recipNorm
+            my *= recipNorm
+            mz *= recipNorm
+
+            magnet_body = np.array([mx, my, mz])
+
+        return magnet_body
+
+
     def gyro(self):
         
         self.g_b = self.g_b + self.g_b_d*self.quad.t_step
         
         read_error = np.random.normal(self.g_b, self.g_std, 3)
         read_gyro = self.quad.state[-3:].flatten()
-        return read_error+read_gyro        
+        return np.array([read_error+read_gyro], dtype='float32').T       
             
     def reset(self):
         self.a_b_grav = 0
@@ -647,70 +695,156 @@ class sensor():
     
     def triad(self):
         gravity_vec = np.array([0, 0, -G])
-        magnet_vec = np.array([-4047, 12911, -9899])*0.01
+        magnet_vec = np.array([-65.269, 165.115,-144.205]) #mGauss
+        
         #Magnetic Vector of Santo André - Brasil in MiliGauss
         #https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml#igrfwmm
-
+        
         
         #Gravity vector as read from body sensor
         induced_acceleration = self.quad.f_in.flatten()/M - (self.R @ np.array([[0, 0, -G]]).T).flatten()
         gravity_body = self.accel() - induced_acceleration
-
         #Magnetic Field vector as read from body sensor
-        magnet_body = self.quad.mat_rot.T @ (np.random.normal(magnet_vec, self.m_std))
+        magnet_body = self.quad.mat_rot.T @ (np.random.normal(magnet_vec, self.m_std))     
       
+
         #Accel vector is more accurate
         #Body Coordinates
         gravity_body = gravity_body / np.linalg.norm(gravity_body)
 
         magnet_body = magnet_body / np.linalg.norm(magnet_body)
 
-
         t1b = gravity_body/np.linalg.norm(gravity_body)
 
         t2b = np.cross(gravity_body, magnet_body)
         t2b = t2b/np.linalg.norm(t2b)
-        
+
         t3b = np.cross(t1b, t2b)
         t3b = t3b/np.linalg.norm(t3b)
-        
+
         tb = np.vstack((t1b, t2b, t3b)).T
+        
 
         #Inertial Coordinates
         gravity_vec = gravity_vec/np.linalg.norm(gravity_vec)
         magnet_vec = magnet_vec / np.linalg.norm(magnet_vec)
 
         t1i = gravity_vec/np.linalg.norm(gravity_vec)
-
-        t2i = np.cross(gravity_vec, magnet_vec)
+        
+        t2i = np.cross(gravity_vec, magnet_vec)        
         t2i = t2i/np.linalg.norm(t2i)
         
         t3i = np.cross(t1i, t2i)
         t3i = t3i/np.linalg.norm(t3i)
         
         ti = np.vstack((t1i, t2i, t3i)).T
-        self.R = tb @ ti.T
 
+        self.R = tb @ ti.T
         q = Rotation.from_matrix(self.R.T).as_quat()
         q = np.concatenate(([q[3]], q[0:3]))
+
         return q, self.R
         
-        
+    def Madgwick_AHRS_Only_Accel(self, gyro_meas, accel_meas, q_ant):
+
+        q0 = q_ant[0]
+        q1 = q_ant[1]
+        q2 = q_ant[2]
+        q3 = q_ant[3]
+
+        gx = gyro_meas[0]
+        gy = gyro_meas[1]
+        gz = gyro_meas[2]
+        ax = accel_meas[0]
+        ay = accel_meas[1]
+        az = accel_meas[2]
+
+        dt = 0.01
+        beta = 0.1
+
+        # Rate of change of quaternion from gyroscope
+        qDot1 = 0.5 * (-q1 * gx - q2 * gy - q3 * gz)
+        qDot2 = 0.5 * (q0 * gx + q2 * gz - q3 * gy)
+        qDot3 = 0.5 * (q0 * gy - q1 * gz + q3 * gx)
+        qDot4 = 0.5 * (q0 * gz + q1 * gy - q2 * gx)
+
+        # Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalisation)
+        if ax !=0 and ay != 0 and az != 0:
+
+            # Normalise accelerometer measurement
+            recipNorm = 1/(math.sqrt(ax * ax + ay * ay + az * az))
+            ax *= recipNorm
+            ay *= recipNorm
+            az *= recipNorm
+
+            # Auxiliary variables to avoid repeated arithmetic
+            _2q0 = 2.0 * q0
+            _2q1 = 2.0 * q1
+            _2q2 = 2.0 * q2
+            _2q3 = 2.0 * q3
+            _4q0 = 4.0 * q0
+            _4q1 = 4.0 * q1
+            _4q2 = 4.0 * q2
+            _4q3 = 4.0 * q3
+            _8q1 = 8.0 * q1
+            _8q2 = 8.0 * q2
+            q0q0 = q0 * q0
+            q1q1 = q1 * q1
+            q2q2 = q2 * q2
+            q3q3 = q3 * q3
+
+            f_g1 = 2*(q0*q2 - q1*q3) - ax
+            f_g2 = -2*(q0*q1 + q2*q3) - ay
+            f_g3 = 2*(q1q1 + q2q2 - 0.5) - az
+
+            # Gradient decent algorithm corrective step
+            s0 = _2q2*f_g1 - _2q1*f_g2
+            s1 = -_2q3*f_g1 - _2q0*f_g2 + _4q1*f_g3
+            s2 = _2q0*f_g1 - _2q3*f_g2 + _4q2*f_g3
+            s3 = -_2q1*f_g1 - _2q2*f_g2
+            recipNorm = 1/ (math.sqrt(s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3)) ## normalise step magnitude
+            s0 *= recipNorm
+            s1 *= recipNorm
+            s2 *= recipNorm
+            s3 *= recipNorm
+
+            # Apply feedback step
+            qDot1 -= beta * s0
+            qDot2 -= beta * s1
+            qDot3 -= beta * s2
+            qDot4 -= beta * s3
+
+
+        # Integrate rate of change of quaternion to yield quaternion
+        q0 += qDot1 * dt
+        q1 += qDot2 * dt
+        q2 += qDot3 * dt
+        q3 += qDot4 * dt
+
+        # Normalise quaternion
+        recipNorm = 1 / (math.sqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3))
+        q0 *= recipNorm
+        q1 *= recipNorm
+        q2 *= recipNorm
+        q3 *= recipNorm
+
+        q = np.array([q0, q1, q2, q3])
+
+        # print('q0: {0}, q1: {1}, q2: {2}, q3: {3}'.format(q[0], q[1], q[2], q[3]))p
+
+        return q
+
     def accel_int(self):
-
-        accel_body = self.accel()
-        _, R = self.triad()
-
-        acceleration = R.T @ accel_body + np.array([0, 0, G])
-
+        accel_body = self.accel()      
+        _, R = self.triad()             
+        acceleration = np.dot(R, accel_body) 
+       
         velocity = self.velocity_t0 + acceleration*self.quad.t_step
         position = self.position_t0 + velocity*self.quad.t_step
         
         self.acceleration_t0 = acceleration
         self.velocity_t0 = velocity
         self.position_t0 = position
-
-
         return acceleration, velocity, position
     
     def gyro_int(self):

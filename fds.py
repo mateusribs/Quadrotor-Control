@@ -320,7 +320,7 @@ def evaluate_equations_accel(t, c_matrix):
     return x_list, v_list, a_list
 
 
-x_wp = np.array([[0, 1, 1, 1, 2]]).T
+x_wp = np.array([[0, 1, 2, 3, 4]]).T
 y_wp = np.array([[0, 0.5, 1, 1.5, 2.5]]).T
 z_wp = np.array([[0, 1, 2, 3, 4]]).T
 psi_wp = np.array([[0, np.pi, 2*np.pi]]).T
@@ -381,8 +381,8 @@ pz, vz, az, jz, sz = evaluate_equations_snap(t, z_matrix)
 # j3.grid()
 # s3.grid()
 
-# fig = plt.figure()
-# ax = plt.axes(projection='3d')
-# ax.plot3D(px, py, pz, 'green')
+fig = plt.figure()
+ax = plt.axes(projection='3d')
+ax.plot3D(px, py, pz, 'green')
 
-# plt.show()
+plt.show()

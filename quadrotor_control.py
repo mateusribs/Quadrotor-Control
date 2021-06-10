@@ -150,6 +150,7 @@ class Controller:
         
         return A_t, B_t, A_a, B_a
     
+    
     def LQR_gain(self, A, B, Q, R):
 
         P = solve_lqr(A, B, Q, R)
@@ -208,7 +209,25 @@ class Controller:
         tau_z = float(u[2])
 
         return tau_x, tau_y, tau_z
-        
+    
+    def att_control_quaternion(self, quat_atual, quat_des, vel_ang_atual, K):
+
+        quat_atual_conj = np.concatenate((np.array([quat_atual[0]]), -1*quat_atual[1:4]), axis=0)
+        quat_error = quat_prod(quat_atual, quat_des)
+
+        quat_error_vec = quat_error[1:4]
+
+        vel_ang_error = np.zeros((3,1)) - vel_ang_atual
+
+        u = -K@np.concatenate((quat_error_vec, vel_ang_error), axis=0)
+
+        taux = float(u[0])
+        tauy = float(u[1])
+        tauz = float(u[2])
+
+        return taux, tauy, tauz
+
+
     ######################################## PID CONTROL APPROACH #############################################################    
 
     def att_control_PD(self, ang_atual, ang_vel_atual, ang_des):
@@ -218,12 +237,12 @@ class Controller:
         psi = float(ang_atual[2])
 
         #PID gains unlimited
-        Kp = np.array([[200, 0 ,0],
-                       [0, 200, 0],
-                       [0, 0, 100]])*8
-        Kd = np.array([[50, 0, 0],
-                       [0, 50, 0],
-                       [0, 0, 35]])*1.1
+        Kp = np.array([[20, 0 ,0],
+                       [0, 20, 0],
+                       [0, 0, 5]])*2
+        Kd = np.array([[12, 0, 0],
+                       [0, 12, 0],
+                       [0, 0, 1]])
 
         # Kp = np.array([[15, 0 ,0],
         #                [0, 15, 0],
@@ -234,7 +253,7 @@ class Controller:
         
         
         angle_error = ang_des - ang_atual
-        print('Erro angulo:', angle_error.T)
+        # print('Erro angulo:', angle_error.T)
         ang_vel_error = np.zeros((3,1)) - ang_vel_atual
         #Compute Optimal Control Law
 
@@ -254,12 +273,12 @@ class Controller:
     def pos_control_PD(self, pos_atual, pos_des, vel_atual, vel_des, accel_des, psi):
 
         #PD gains unlimited
-        Kp = np.array([[4, 0 ,0],
+        Kp = np.array([[2, 0 ,0],
                        [0, 2, 0],
-                       [0, 0, 9.5]])*10.5
-        Kd = np.array([[4.5, 0, 0],
-                       [0, 4, 0],
-                       [0, 0, 4]])*3.8
+                       [0, 0, 1.5]])*1.5
+        Kd = np.array([[3, 0, 0],
+                       [0, 2, 0],
+                       [0, 0, 1]])*1.5
 
         # Kp = np.array([[200, 0 ,0],
         #                [0, 200, 0],
@@ -291,6 +310,34 @@ class Controller:
 
         return T, phi_des, theta_des
 
+    def att_control_quaternion_PD(self, quat_atual, quat_des, vel_ang_atual):
+
+        quat_atual_conj = np.concatenate((np.array([quat_atual[0]]), -1*quat_atual[1:4]), axis=0)
+        quat_error = quat_prod(quat_atual, quat_des)
+
+        quat_error_vec = quat_error[1:4]
+
+        vel_ang_error = np.zeros((3,1)) - vel_ang_atual
+
+        Kp = np.array([[2.5, 0, 0],
+                       [0, 2, 0],
+                       [0, 0, .5]])*10
+
+        Kd = np.array([[3, 0, 0],
+                       [0, 2, 0],
+                       [0, 0, 0.5]])*0.8
+
+        u = Kp@quat_error_vec + Kd@vel_ang_error
+
+        taux = float(u[0])
+        tauy = float(u[1])
+        tauz = float(u[2])
+
+        return taux, tauy, tauz
+
+
+
+    ################################### BACKSTEPPING CONTROL #######################################
 
 
     #################################### TRAJECTORY PLANNER FUNCTIONS ######################################################
