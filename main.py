@@ -23,9 +23,9 @@ inner_length = 1
 controller = Controller(total_time = 10, sample_time = 0.01, inner_length = inner_length)
 
 x_wp = np.array([[0.2, 0.3, 0.4, 0.5, 0.6]]).T
-y_wp = np.array([[3, 0, 0.5, 0.5, 0.5]]).T*0
-z_wp = np.array([[3, 3.5, 4, 4, 4]]).T
-psi_wp = np.array([[0, np.pi/12, np.pi/8, np.pi/4, np.pi]]).T*0
+y_wp = np.array([[0, 0, 0.2, 0.3, 0.3]]).T
+z_wp = np.array([[2, 2.5, 3, 3, 3]]).T
+psi_wp = np.array([[0, 0, 0, np.pi/4, np.pi/2]]).T
 
 t = [0, 5, 10, 15, 20]
 step = 0.01
@@ -44,7 +44,7 @@ psi_ref, _, _ = controller.evaluate_equations_accel(t, step, psi_matrix)
 outer_length = len(x_ref)
 
 #Get initial states
-x_atual, _ = quad_model.reset(np.array([0.2, 0, 0, 0, 3, 0, 1, 0, 0, 0, 0, 0, 0]))
+x_atual, _ = quad_model.reset(np.array([0.2, 0, 0, 0, 2, 0, 1, 0, 0, 0, 0, 0, 0]))
 
 sens.reset()
 
@@ -66,32 +66,32 @@ ang_ref_list = []
 T_list = []
 
 
-# Qa = np.array([[90, 0, 0, 0, 0, 0],
-#                 [0, 100, 0, 0, 0, 0],
-#                 [0, 0, 10, 0, 0, 0],
+# Qa = np.array([[1, 0, 0, 0, 0, 0],
+#                 [0, 1, 0, 0, 0, 0],
+#                 [0, 0, 1, 0, 0, 0],
 #                 [0, 0, 0, 10**-3, 0, 0],
 #                 [0, 0, 0, 0, 10**-3, 0],
 #                 [0, 0, 0, 0, 0, 10**-4]])*1
     
-# Ra = np.array([[.085, 0, 0],
-#                [0, .085, 0],
-#                [0, 0, 1]])*0.1
+# Ra = np.array([[1, 0, 0],
+#                [0, 1, 0],
+#                [0, 0, 1]])*1
 
 # At, Bt, Aa, Ba = controller.linearized_matrices(False)
 # Ka = controller.LQR_gain(Aa, Ba, Qa, Ra)
 
 
 
-# Qt = np.array([[50, 0, 0, 0, 0, 0],
-#                 [0, 40, 0, 0, 0, 0],
-#                 [0, 0, 5, 0, 0, 0],
-#                 [0, 0, 0, 0.01, 0, 0],
-#                 [0, 0, 0, 0, .01, 0],
-#                 [0, 0, 0, 0, 0, 0.001]])*0.5
+# Qt = np.array([[1, 0, 0, 0, 0, 0],
+#                 [0, 1, 0, 0, 0, 0],
+#                 [0, 0, 1, 0, 0, 0],
+#                 [0, 0, 0, 1, 0, 0],
+#                 [0, 0, 0, 0, 1, 0],
+#                 [0, 0, 0, 0, 0, 1]])
 
-# Rt = np.array([[0.95, 0, 0],
-#                [0, 0.95, 0],
-#                [0, 0, .001]])*28
+# Rt = np.array([[1, 0, 0],
+#                [0, 1, 0],
+#                [0, 0, 1]])*1
 
 # Kt = controller.LQR_gain(At, Bt, Qt, Rt)
 
@@ -112,11 +112,15 @@ for i in range(outer_length):
 
     for j in range(inner_length):
         
-        mekf = MEKF(quad_model, sens, False)
+        # mekf = MEKF(quad_model, sens, False)
         ang = quad_model.ang
-        mekf.MEKF()
-        ang_atual = np.array([[mekf.roll_est, mekf.pitch_est, ang[2]]]).T
-        ang_vel_atual = sens.gyro()
+        ang_vel = quad_model.ang_vel
+        # mekf.MEKF()
+        # ang_atual = np.array([[mekf.roll_est, mekf.pitch_est, ang[2]]]).T
+        # ang_vel_atual = sens.gyro()
+
+        ang_atual = np.array([[ang[0], ang[1], ang[2]]]).T
+        ang_vel_atual = np.array([[ang_vel[0], ang_vel[1], ang_vel[2]]]).T
 
         # taux, tauy, tauz = controller.att_control(ang_atual, ang_des, ang_vel_atual, Ka)
         taux, tauy, tauz = controller.att_control_PD(ang_atual, ang_vel_atual, ang_des)
